@@ -10,12 +10,12 @@ suppressPackageStartupMessages({
 
 # Parse arguments
 option_list <- list(
-  make_option(c("--input_data"), type="character", help="Path to BASS input RData file (spatialLIBD format)"),
+  make_option(c("--data_path"), type="character", help="Path to data directory containing RData folder"),
   make_option(c("--sample_id"), type="character", help="Sample identifier"),
   make_option(c("--output_dir"), type="character", help="Output directory"),
   make_option(c("--n_clusters"), type="integer", default=7, help="Number of spatial domains [default %default]"),
   make_option(c("--C"), type="integer", default=20, help="Number of cell types [default %default]"),
-  make_option(c("--random_seed"), type="integer", default=0, help="Random seed [default %default]")
+  make_option(c("--random_seed"), type="integer", default=2023, help="Random seed [default %default]")
 )
 
 parser <- OptionParser(option_list=option_list)
@@ -26,9 +26,18 @@ cat("[BASS] Starting clustering for", args$sample_id, "...\n")
 # Set random seed
 set.seed(args$random_seed)
 
+# Construct path to RData file
+rdata_dir <- file.path(args$data_path, "RData")
+input_data_path <- file.path(rdata_dir, "spatialLIBD_p1.RData")
+
+# Check if file exists
+if (!file.exists(input_data_path)) {
+  stop(paste("[BASS] Error: Input data file not found:", input_data_path))
+}
+
 # Load data
-cat("[BASS] Loading data from", args$input_data, "...\n")
-load(args$input_data)
+cat("[BASS] Loading data from", input_data_path, "...\n")
+load(input_data_path)
 
 # Extract data for the specific sample
 cat("[BASS] Extracting data for sample", args$sample_id, "...\n")
@@ -95,4 +104,5 @@ write.csv(res, output_file, row.names = FALSE)
 
 cat("[BASS] Results saved to", output_file, "\n")
 cat("[BASS] Completed successfully!\n")
+
 
