@@ -13,6 +13,14 @@ import json
 from pathlib import Path
 from datetime import datetime
 
+# Check for required dependencies
+try:
+    import yaml
+except ImportError:
+    print("Error: PyYAML is not installed.")
+    print("Please install it with: pip install pyyaml")
+    sys.exit(1)
+
 
 class ToolRunnerAgent:
     """Main orchestrator for spatial clustering pipeline"""
@@ -40,8 +48,7 @@ class ToolRunnerAgent:
         config = {}
         
         if config_path and os.path.exists(config_path):
-            import yaml
-            with open(config_path, 'r') as f:
+            with open(config_path, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
         
         # Override with kwargs
@@ -57,6 +64,17 @@ class ToolRunnerAgent:
             'SEDR', 'GraphST', 'STAGATE', 'stLearn'
         ])
         config.setdefault('min_success', 5)
+        config.setdefault('timeout', 3600)  # Default 1 hour timeout
+        
+        # Validate required parameters
+        required = ['data_path', 'sample_id', 'output_dir']
+        missing = [k for k in required if k not in config or not config[k]]
+        if missing:
+            raise ValueError(f"Missing required parameters: {', '.join(missing)}")
+        
+        # Validate data_path exists
+        if not os.path.exists(config['data_path']):
+            raise ValueError(f"Data path does not exist: {config['data_path']}")
         
         return config
     
@@ -87,25 +105,32 @@ class ToolRunnerAgent:
         print(f"{'='*60}")
         
         tool_dir = Path(__file__).parent / "tools"
-        data_path = self.config['data_path']
+        data_path = str(Path(self.config['data_path']).absolute())
         sample_id = self.config['sample_id']
         output_dir = Path(self.config['output_dir']) / "domains"
         n_clusters = self.config['n_clusters']
         random_seed = self.config['random_seed']
+        timeout = self.config.get('timeout', 3600)
         
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        env_name, env_path = self._get_env_command(method)
+        env_name, _ = self._get_env_command(method)
         
-        # Build command
+        # Build command with proper path quoting and environment activation
         if method in ['IRIS', 'BASS', 'DR-SC', 'BayesSpace']:
             # R tools
-            script = tool_dir / f"{method.lower().replace('-', '')}_tool.R"
-            cmd = f"Rscript {script} --data_path {data_path} --sample_id {sample_id} --output_dir {output_dir} --n_clusters {n_clusters} --random_seed {random_seed}"
+            script = str((tool_dir / f"{method.lower().replace('-', '')}_tool.R").absolute())
+            base_cmd = f'Rscript "{script}" --data_path "{data_path}" --sample_id {sample_id} --output_dir "{output_dir}" --n_clusters {n_clusters} --random_seed {random_seed}'
         else:
             # Python tools
-            script = tool_dir / f"{method.lower()}_tool.py"
-            cmd = f"python {script} --data_path {data_path} --sample_id {sample_id} --output_dir {output_dir} --n_clusters {n_clusters} --random_seed {random_seed}"
+            script = str((tool_dir / f"{method.lower()}_tool.py").absolute())
+            base_cmd = f'python "{script}" --data_path "{data_path}" --sample_id {sample_id} --output_dir "{output_dir}" --n_clusters {n_clusters} --random_seed {random_seed}'
+        
+        # Add environment activation
+        if os.name == 'nt':  # Windows
+            cmd = f'call conda activate {env_name} && {base_cmd}'
+        else:  # Linux/Mac
+            cmd = f'source activate {env_name} && {base_cmd}'
         
         try:
             result = subprocess.run(
@@ -113,7 +138,7 @@ class ToolRunnerAgent:
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=3600  # 1 hour timeout
+                timeout=timeout
             )
             
             if result.returncode == 0:
@@ -122,16 +147,19 @@ class ToolRunnerAgent:
                 return True
             else:
                 print(f"✗ {method} failed with return code {result.returncode}")
-                print(f"STDERR: {result.stderr}")
+                print(f"STDOUT:\n{result.stdout}")
+                print(f"STDERR:\n{result.stderr}")
                 self.results['methods_failed'].append(method)
                 return False
                 
         except subprocess.TimeoutExpired:
-            print(f"✗ {method} timed out after 1 hour")
+            print(f"✗ {method} timed out after {timeout} seconds")
             self.results['methods_failed'].append(method)
             return False
         except Exception as e:
-            print(f"✗ {method} failed with error: {e}")
+            print(f"✗ {method} failed with exception: {e}")
+            import traceback
+            print(traceback.format_exc())
             self.results['methods_failed'].append(method)
             return False
     
@@ -178,9 +206,9 @@ class ToolRunnerAgent:
         if not domain_files:
             raise RuntimeError("No domain files found for alignment")
         
-        domain_files_str = " ".join([str(f) for f in domain_files])
+        domain_files_str = " ".join([f'"{str(f)}"' for f in domain_files])
         
-        cmd = f"python {align_script} --data_path {data_path} --domain_files {domain_files_str} --output_dir {output_dir} --sample_id {sample_id}"
+        cmd = f'python "{align_script}" --data_path "{data_path}" --domain_files {domain_files_str} --output_dir "{output_dir}" --sample_id {sample_id}'
         
         if 'reference_col' in self.config:
             cmd += f" --reference_col {self.config['reference_col']}"
@@ -221,7 +249,7 @@ class ToolRunnerAgent:
         for name, script, out_dir in analyses:
             print(f"\nGenerating {name}...")
             script_path = postprocess_dir / script
-            cmd = f"python {script_path} --adata_path {aligned_file} --output_dir {out_dir} --sample_id {sample_id}"
+            cmd = f'python "{script_path}" --adata_path "{aligned_file}" --output_dir "{out_dir}" --sample_id {sample_id}'
             
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             
@@ -325,4 +353,5 @@ Examples:
 
 if __name__ == '__main__':
     main()
+
 

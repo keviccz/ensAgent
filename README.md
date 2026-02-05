@@ -1,280 +1,229 @@
-# Tool-Runner Agent: Spatial Transcriptomics Clustering Ensemble
+# EnsAgent Tool-Runner: Ensemble Spatial Clustering Framework
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
-[![R](https://img.shields.io/badge/R-4.2%2B-276DC3.svg)](https://www.r-project.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+A tool orchestration system for spatial transcriptomics analysis that integrates eight state-of-the-art clustering methods to generate robust spatial domain partitions.
 
-**A multi-environment tool orchestration system for robust spatial domain identification in spatial transcriptomics data.**
+## Overview
 
-Part of the **ensAgent** framework for ensemble-based annotation in spatial transcriptomics.
+The Tool-Runner Agent is the first module of the EnsAgent framework, designed to execute multiple spatial clustering algorithms and standardize their outputs for ensemble-based analysis. This system addresses the challenge of inconsistent clustering results across different methods by providing:
 
----
+- **Automated Tool Execution**: Parallel execution of 8 spatial clustering methods
+- **Label Alignment**: IoU-based Hungarian matching algorithm for domain label standardization
+- **Downstream Analysis**: Automated generation of differential expression, pathway enrichment, and visualizations
 
-## 📖 Overview
+## Supported Methods
 
-This repository contains the **Tool-Runner Agent**, which orchestrates 8 state-of-the-art spatial clustering methods, aligns their outputs, and generates comprehensive downstream analyses. This is the first stage of the ensAgent pipeline described in our paper:
+| Method | Environment | Reference | Input Format |
+|--------|-------------|-----------|--------------|
+| **IRIS** | R | [Nat Commun 2024](https://doi.org/10.1038/s41467-024-46638-4) | RDS files |
+| **BASS** | R | [Nat Biotechnol 2022](https://doi.org/10.1038/s41587-022-01536-2) | RData |
+| **DR-SC** | R | [Nat Commun 2023](https://doi.org/10.1038/s41467-023-35947-w) | Visium |
+| **BayesSpace** | R | [Nat Biotechnol 2021](https://doi.org/10.1038/s41587-021-00935-2) | Visium |
+| **SEDR** | Python | [Nat Commun 2022](https://doi.org/10.1038/s41467-022-29439-6) | Visium |
+| **GraphST** | Python | [Nat Commun 2023](https://doi.org/10.1038/s41467-023-36796-3) | Visium |
+| **STAGATE** | Python | [Nat Commun 2022](https://doi.org/10.1038/s41467-022-29439-6) | Visium |
+| **stLearn** | Python | [bioRxiv 2020](https://doi.org/10.1101/2020.05.31.125658) | Visium |
 
-> **ensAgent: a tool-ensemble multiple Agent system for robust annotation in spatial transcriptomics**
+## System Requirements
 
-### Pipeline Stages
+### Hardware
+- Minimum 16GB RAM (32GB recommended)
+- Multi-core CPU (8+ cores recommended)
+- GPU optional (accelerates deep learning methods)
 
-1. **Tool Execution**: Runs 8 clustering methods in parallel
-2. **Label Alignment**: Aligns domain labels using IoU-based matching
-3. **Downstream Analysis**: Generates DEGs, pathway enrichment, visualizations, and spot files
+### Software
+- Miniconda or Anaconda
+- Windows 10+ / Linux / macOS
+- Python 3.9+
+- R 4.2+
 
-### Supported Methods
+### Environment Configuration
 
-| Method | Environment | Description |
-|--------|-------------|-------------|
-| **IRIS** | R | Integrative Robust Inference of Spatial domains |
-| **BASS** | R | Bayesian Analytics for Spatial Structures |
-| **DR-SC** | R | Dimension Reduction with Spatial Clustering |
-| **BayesSpace** | R | Bayesian spatial clustering |
-| **SEDR** | PY | Spatial Embedding with Dual Regularization |
-| **GraphST** | PY | Graph-based Spatial Transcriptomics |
-| **STAGATE** | PY | Spatial Transcriptomics Analysis with Graph Attention |
-| **stLearn** | PY2 | Spatial Learning framework |
+Due to package dependency conflicts, three separate conda environments are required:
 
----
+- **R environment**: IRIS, BASS, DR-SC, BayesSpace
+- **PY environment**: SEDR, GraphST, STAGATE
+- **PY2 environment**: stLearn
 
-## 🚀 Quick Start
+## Installation
 
-### Prerequisites
-
-- **Miniconda or Anaconda** installed
-- **Windows 10+** (tested environment)
-- **At least 16GB RAM** recommended
-- **GPU** optional (speeds up GraphST, SEDR, STAGATE)
-
-### Installation
-
-#### Step 1: Clone the repository
+### 1. Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/ensAgent-ToolRunner.git
-cd ensAgent-ToolRunner
+git clone https://github.com/yourusername/EnsAgent-ToolRunner.git
+cd EnsAgent-ToolRunner
 ```
 
-#### Step 2: Create conda environments
-
-Due to package conflicts, **3 separate environments** are required:
+### 2. Setup Conda Environments
 
 ```bash
-# R environment (for IRIS, BASS, DR-SC, BayesSpace)
+# Create R environment
 conda env create -f envs/R_environment.yml
 
-# PY environment (for SEDR, GraphST, STAGATE)
+# Create PY environment
 conda env create -f envs/PY_environment.yml
 
-# PY2 environment (for stLearn)
+# Create PY2 environment
 conda env create -f envs/PY2_environment.yml
 ```
 
-**Note**: Environment files are located in the parent directory (`../R_environment.yml`, `../PY_environment.yml`, `../PY2_environment.yml`). Please manually copy them to the `envs/` folder if not present:
+**Note**: Environment file creation may take 30-60 minutes depending on network speed.
+
+### 3. Verify Installation
 
 ```bash
-# On Windows PowerShell
-Copy-Item ..\R_environment.yml envs\
-Copy-Item ..\PY_environment.yml envs\
-Copy-Item ..\PY2_environment.yml envs\
-```
-
-#### Step 3: Verify installation
-
-```bash
+# Test R environment
 conda activate R
 Rscript --version
+R --version
 conda deactivate
 
+# Test PY environment
 conda activate PY
 python --version
 conda deactivate
 
+# Test PY2 environment
 conda activate PY2
 python --version
 conda deactivate
 ```
 
----
+## Quick Start
 
-## 📊 Usage
+### Prepare Input Data
 
-### Demo: DLPFC_151507 Sample
-
-We provide a complete example for the DLPFC (Dorsolateral Prefrontal Cortex) dataset.
-
-#### Step 1: Prepare your data
-
-Organize your Visium data as follows:
+Organize your 10X Visium data in the following structure:
 
 ```
-D:/zuo ye/YAN0/zhangmingshen/DATA/DLPFC/151507/
-├── filtered_feature_bc_matrix.h5
-├── metadata.tsv (optional, for reference annotations)
-└── spatial/
-    ├── tissue_hires_image.png
-    ├── tissue_lowres_image.png
-    ├── scalefactors_json.json
-    └── tissue_positions_list.csv
+data_directory/
+├── filtered_feature_bc_matrix.h5    # Required
+├── metadata.tsv                      # Optional (for reference annotations)
+├── spatial/                          # Required
+│   ├── tissue_hires_image.png
+│   ├── tissue_lowres_image.png
+│   ├── scalefactors_json.json
+│   └── tissue_positions_list.csv
+└── RData/                            # Required for IRIS/BASS
+    ├── countList_spatial_LIBD.RDS
+    ├── scRef_input_mainExample.RDS
+    └── spatialLIBD_p1.RData
 ```
 
-#### Step 2: Configure the run
+### Configure Parameters
 
 Edit `configs/DLPFC_151507.yaml`:
 
 ```yaml
 sample_id: "DLPFC_151507"
-data_path: "D:/path/to/your/data/151507"  # UPDATE THIS
+data_path: "/path/to/your/data"  # Update this path
 output_dir: "./output/DLPFC_151507"
 n_clusters: 7
+random_seed: 2023
+timeout: 7200  # Seconds per method
 ```
 
-#### Step 3: Run the pipeline
+### Execute Pipeline
 
 ```bash
-# Using config file (recommended)
+# Using configuration file
 python orchestrator.py --config configs/DLPFC_151507.yaml
 
-# Or using command-line arguments
+# Using command-line arguments
 python orchestrator.py \
-  --data_path D:/path/to/data/151507 \
+  --data_path /path/to/data \
   --sample_id DLPFC_151507 \
   --output_dir ./output/DLPFC_151507 \
   --n_clusters 7
 ```
 
-#### Step 4: Check results
+### Output Structure
 
 ```
 output/DLPFC_151507/
-├── domains/                      # Raw clustering results
+├── domains/                      # Raw clustering results (8 CSV files)
 │   ├── IRIS_DLPFC_151507_domain.csv
 │   ├── BASS_DLPFC_151507_domain.csv
-│   └── ... (8 files total)
+│   └── ...
 ├── DLPFC_151507_aligned.h5ad     # Aligned AnnData object
-├── spot/                         # Spot-level data
-│   ├── IRIS_domain_DLPFC_151507_spot.csv
-│   └── ... (8 files)
-├── PICTURES/                     # Spatial visualizations
-│   ├── IRIS_domain_DLPFC_151507.png
-│   └── ... (8 files)
-├── DEGs/                         # Differentially expressed genes
-│   ├── IRIS_domain_DLPFC_151507_DEGs.csv
-│   └── ... (8 files)
-├── PATHWAY/                      # Pathway enrichment results
-│   ├── IRIS_domain_DLPFC_151507_PATHWAY.csv
-│   └── ... (8 files)
+├── spot/                         # Spot-level data (8 CSV files)
+├── PICTURES/                     # Spatial visualizations (8 PNG files)
+├── DEGs/                         # Differential expression results (8 CSV files)
+├── PATHWAY/                      # Pathway enrichment results (8 CSV files)
 └── tool_runner_report.json       # Execution summary
 ```
 
----
+## Advanced Usage
 
-## 🔧 Advanced Configuration
-
-### Custom Method Selection
-
-Run only specific methods:
+### Selective Method Execution
 
 ```bash
 python orchestrator.py \
   --config configs/DLPFC_151507.yaml \
-  --methods IRIS STAGATE GraphST SEDR
+  --methods SEDR GraphST STAGATE
 ```
 
-### Alignment Parameters
-
-Fine-tune alignment behavior in your config:
+### Custom Parameters
 
 ```yaml
+# In config file
+methods:
+  - IRIS
+  - SEDR
+  - GraphST
+  
+min_success: 2  # Minimum successful methods to proceed
+timeout: 7200   # 2 hours timeout per method
+
 alignment:
-  enable_flip_check: true           # Auto-flip inverted domain orders
-  flip_corr_threshold: 0.55         # Correlation threshold for flipping
-  enable_mean_order_fallback: true  # Use mean layer ordering for low correlation
-  low_corr_threshold: 0.30          # Threshold for low correlation
-```
+  enable_flip_check: true
+  flip_corr_threshold: 0.55
+  enable_mean_order_fallback: true
+  low_corr_threshold: 0.30
 
-### Downstream Analysis Parameters
-
-```yaml
 downstream:
-  min_gene_pct: 0.1                 # Min % of cells for gene filtering
-  gene_sets: "KEGG_2021_Human"      # Gene set database for enrichment
+  min_gene_pct: 0.1
+  gene_sets: "KEGG_2021_Human"
 ```
 
----
-
-## 📁 Project Structure
-
-```
-ensAgent-ToolRunner/
-├── orchestrator.py           # Main controller
-├── configs/                  # Configuration files
-│   └── DLPFC_151507.yaml
-├── tools/                    # Individual clustering tools
-│   ├── iris_tool.R
-│   ├── bass_tool.R
-│   ├── drsc_tool.R
-│   ├── bayesspace_tool.R
-│   ├── sedr_tool.py
-│   ├── graphst_tool.py
-│   ├── stagate_tool.py
-│   └── stlearn_tool.py
-├── postprocess/              # Downstream analysis scripts
-│   ├── align_labels.py
-│   ├── generate_degs.py
-│   ├── generate_spots.py
-│   ├── generate_pathways.py
-│   └── generate_pictures.py
-├── envs/                     # Conda environment files
-│   ├── R_environment.yml
-│   ├── PY_environment.yml
-│   └── PY2_environment.yml
-├── examples/                 # Example data and notebooks
-└── README.md
-```
-
----
-
-## 🔬 Methodology
+## Methodology
 
 ### Phase 1: Tool Execution
 
-Each method independently clusters the spatial transcriptomics data. Tools are executed with:
-- Standardized preprocessing (normalization, HVG selection, PCA)
-- Consistent random seeds for reproducibility
-- Automatic error handling and retry logic
+Each clustering method is executed independently with standardized preprocessing:
+- Gene filtering (min_cells=50, min_counts=10)
+- Normalization and log-transformation
+- Highly variable gene selection (n=2000-3000)
+- PCA dimensionality reduction (n_components=200)
 
 ### Phase 2: Label Alignment
 
-Domain labels from different methods are aligned using an IoU-based Hungarian matching algorithm:
+The alignment algorithm addresses label inconsistency through:
 
-1. **Mode-based mapping**: Each domain is mapped to the most common reference layer
-2. **Low-correlation fallback**: For poor alignments (Spearman ρ < 0.3), use mean layer ordering
-3. **Auto-flip detection**: Automatically correct inverted domain orders (ρ < -0.55)
-4. **Validation**: Ensure label continuity and domain count consistency
+1. **Mode-based Mapping**: Each domain is assigned to the reference layer with maximum overlap
+2. **Low-Correlation Fallback**: For Spearman ρ < 0.3, uses mean layer position ordering
+3. **Direction Auto-Correction**: Automatically flips inverted domain orders (ρ < -0.55)
+4. **Validation**: Ensures label continuity and domain count consistency
 
 ### Phase 3: Downstream Analysis
 
-For each aligned method:
-- **DEGs**: Wilcoxon rank-sum test (adj. p < 0.05, |log2FC| > 1)
-- **Pathway Enrichment**: GSEA with KEGG/GO databases
-- **Visualizations**: High-resolution spatial domain plots
-- **Spot Files**: Structured CSV with coordinates and domain labels
+For each aligned clustering result:
+- **Differential Expression**: Wilcoxon rank-sum test (adjusted p < 0.05, |log2FC| > 1)
+- **Pathway Enrichment**: GSEA with configurable gene set databases
+- **Spatial Visualization**: High-resolution PNG (300 DPI)
+- **Structured Output**: CSV format with spot coordinates and domain labels
 
----
+## File Formats
 
-## 📊 Output Formats
-
-### Domain Files (CSV)
+### Domain CSV
 
 ```csv
-spot_id,{METHOD}_domain
+spot_id,METHOD_domain
 AAACAAGTATCTCCCA-1,1
 AAACACCAATAACTGC-1,3
 ...
 ```
 
-### Spot Files (CSV)
+### Spot CSV
 
 ```csv
 spot_id,x,y,in_tissue,n_genes,spatial_domain
@@ -282,103 +231,61 @@ AAACAAGTATCTCCCA-1,100.5,200.3,True,1500,1
 ...
 ```
 
-### DEG Files (CSV)
+### DEG CSV
 
 ```csv
 domain,names,logfoldchanges,pvals_adj
 1,SNAP25,2.34,1.2e-45
-1,SYT1,2.01,3.4e-38
 ...
 ```
 
-### Pathway Files (CSV)
+### Pathway CSV
 
 ```csv
 Domain,Term,NES,NOM p-val,Lead_genes
-1,Neuroactive ligand-receptor,2.45,0.001,GRIA1;GRIN2A;...
+1,Neuroactive ligand-receptor,2.45,0.001,GRIA1;GRIN2A
 ...
 ```
 
----
+## Troubleshooting
 
-## ❓ Troubleshooting
+### Method Fails
 
-### Common Issues
+Check `tool_runner_report.json` for detailed error information. The pipeline continues if at least `min_success` methods complete successfully.
 
-**1. Tool fails with "module not found"**
-- Ensure you're in the correct conda environment
-- Check `conda list` for missing packages
-- Try re-creating the environment
+### Memory Errors
 
-**2. Alignment fails with "domain count mismatch"**
-- Some methods may produce fewer/more domains than expected
-- Check `tool_runner_report.json` for failed methods
-- Lower `min_success` in config if acceptable
-
-**3. R scripts fail on Windows**
-- Ensure Rscript is in your PATH
-- Check R_HOME environment variable
-- Try running R tools manually first
-
-**4. Memory errors**
-- Reduce `n_top_genes` in preprocessing
+- Close memory-intensive applications
+- Reduce `n_top_genes` in method configurations
 - Process fewer methods simultaneously
-- Use a machine with more RAM
 
-### Getting Help
+### Environment Issues
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/ensAgent-ToolRunner/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/ensAgent-ToolRunner/discussions)
-- **Email**: your.email@example.com
-
----
-
-## 📄 Citation
-
-If you use this tool in your research, please cite:
-
-```bibtex
-@article{ensagent2026,
-  title={ensAgent: a tool-ensemble multiple Agent system for robust annotation in spatial transcriptomics},
-  author={Your Name et al.},
-  journal={TBD},
-  year={2026}
-}
+Verify environment activation:
+```bash
+conda activate R
+which Rscript  # Should point to conda environment
 ```
 
----
+### Path Issues
 
-## 🤝 Contributing
+Ensure paths do not contain special characters or spaces. Use absolute paths when possible.
 
-Contributions are welcome! Please:
+## Performance Optimization
 
+- **GPU Acceleration**: Install CUDA-enabled PyTorch for SEDR, GraphST, and STAGATE
+- **Parallel Execution**: Methods run sequentially by default; modify orchestrator for parallel execution
+- **Memory Management**: Adjust `n_top_genes` based on available RAM
+
+## Contributing
+
+Contributions are welcome. Please:
 1. Fork the repository
 2. Create a feature branch
-3. Submit a pull request
+3. Submit a pull request with detailed description
 
----
+## Acknowledgments
 
-## 📜 License
+We thank the authors of IRIS, BASS, DR-SC, BayesSpace, SEDR, GraphST, STAGATE, and stLearn for making their methods publicly available. This tool integrates and standardizes these excellent approaches for ensemble-based spatial analysis.
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-This tool integrates the following excellent methods:
-- [IRIS](https://github.com/LilithYe/IRIS)
-- [BASS](https://github.com/zhengli09/BASS)
-- [DR-SC](https://github.com/feiyoung/DR.SC)
-- [BayesSpace](https://github.com/edward130603/BayesSpace)
-- [SEDR](https://github.com/JinmiaoChenLab/SEDR)
-- [GraphST](https://github.com/JinmiaoChenLab/GraphST)
-- [STAGATE](https://github.com/zhanglabtools/STAGATE)
-- [stLearn](https://github.com/BiomedicalMachineLearning/stLearn)
-
-We thank the authors for making their code publicly available.
-
----
-
-**For the complete ensAgent pipeline (including annotation stages), see the main repository.**
 
