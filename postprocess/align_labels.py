@@ -199,10 +199,21 @@ def main():
             continue
             
         method_name = os.path.basename(domain_file).split('_')[0]
-        df = pd.read_csv(domain_file, index_col=0 if 'spot_id' in pd.read_csv(domain_file, nrows=0).columns else None)
+        
+        # Read CSV and handle index properly
+        df = pd.read_csv(domain_file)
+        if 'spot_id' in df.columns:
+            df = df.set_index('spot_id')
+        elif df.columns[0] == 'Unnamed: 0':  # First column is index without name
+            df = df.set_index(df.columns[0])
+            df.index.name = 'spot_id'
         
         # Find domain column
-        domain_col = [c for c in df.columns if 'domain' in c.lower()][0]
+        domain_cols = [c for c in df.columns if 'domain' in c.lower()]
+        if not domain_cols:
+            print(f"[Alignment] Warning: No domain column found in {domain_file}, skipping")
+            continue
+        domain_col = domain_cols[0]
         col_name = f"{method_name}_domain"
         
         common = adata.obs_names.intersection(df.index)
@@ -239,4 +250,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
