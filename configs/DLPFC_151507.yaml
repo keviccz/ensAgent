@@ -16,6 +16,7 @@ platform: "10X Visium"
 # Clustering parameters
 n_clusters: 7  # Number of spatial domains
 random_seed: 2023  # For reproducibility
+timeout: 7200  # Timeout for each method in seconds (default: 7200 = 2 hour)
 
 # Methods to run (comment out to disable specific methods)
 methods:
@@ -47,4 +48,5 @@ alignment:
 downstream:
   min_gene_pct: 0.1  # Minimum percentage of cells for gene filtering
   gene_sets: "KEGG_2021_Human"  # Gene set database for pathway enrichment
+
 
