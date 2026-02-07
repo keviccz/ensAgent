@@ -1,6 +1,6 @@
 # EnsAgent Overview (Tool-runner → Scoring → BEST → Annotation)
 
-![](E:\A%20project\EnsAgent%20Files\EnsAgent\example_pic\ensagent.png)
+![EnsAgent UI](example_pic/ensagent.png)
 
 1) **Tool-runner**: runs multiple clustering tools plus alignment and downstream analyses  
 2) **Scoring**: LLM scoring and aggregation, builds consensus matrices  
