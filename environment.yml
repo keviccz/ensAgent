@@ -1,0 +1,39 @@
+name: ensagent  # main env for: scoring + annotation + ensagent_agent + streamlit_app
+channels:
+  - conda-forge
+  # Only conda-forge (no defaults) to avoid OOM when solving with many channels
+dependencies:
+  - python=3.10
+  - pip
+  # Core scientific stack (minimal conda packages to speed up solving)
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - requests
+  - tqdm
+  - sqlalchemy
+  - jinja2
+  - typing-extensions
+  - python-dotenv
+  - pillow
+  # UI (streamlit_app)
+  - plotly
+  - streamlit
+  - pip:
+      # LLM & LangChain (scoring + annotation + chat agent)
+      - openai==1.109.1
+      - langchain
+      - langchain-community
+      - langchain-openai==0.1.0
+      - chromadb
+      - sentence-transformers
+      # Retry logic
+      - tenacity==8.5.0
+      # Bioinformatics (scoring) - use pip for faster install
+      - scanpy
+      - anndata
+      # Pathway analysis
+      - gseapy

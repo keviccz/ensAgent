@@ -1,0 +1,52 @@
+# Configuration for DLPFC_151507 Sample
+# Tool-Runner Agent Demo
+
+# Sample information
+sample_id: "DLPFC_151507"
+
+# Data paths
+data_path: "Tool-runner/151507"  # Path to Visium data directory
+output_dir: "output/tool_runner/DLPFC_151507"  # Output directory
+
+# Biological context (optional)
+biological_context: "Dorsolateral prefrontal cortex (DLPFC) human brain tissue with cortical layers"
+tissue_type: "brain"
+platform: "10X Visium"
+
+# Clustering parameters
+n_clusters: 7  # Number of spatial domains
+random_seed: 2023  # For reproducibility
+timeout: 7200  # Timeout for each method in seconds (default: 7200 = 2 hour)
+
+# Methods to run (comment out to disable specific methods)
+methods:
+  - IRIS
+  - BASS
+  - DR-SC
+  - BayesSpace
+  - SEDR
+  - GraphST
+  - STAGATE
+  - stLearn
+
+# Alignment parameters
+reference_col: "layer_guess"  # Reference annotation column (if available in metadata.tsv)
+min_success: 5  # Minimum number of successful methods required to proceed
+
+# Environment paths (optional - will use conda activate by default)
+# r_env: "conda activate R"
+# py_env: "conda activate PY"
+# py2_env: "conda activate PY2"
+
+# Advanced parameters (usually don't need to change)
+alignment:
+  enable_flip_check: true
+  flip_corr_threshold: 0.55
+  enable_mean_order_fallback: true
+  low_corr_threshold: 0.30
+
+downstream:
+  min_gene_pct: 0.1  # Minimum percentage of cells for gene filtering
+  gene_sets: "KEGG_2021_Human"  # Gene set database for pathway enrichment
+
+

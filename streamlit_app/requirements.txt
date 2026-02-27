@@ -1,0 +1,7 @@
+# EnsAgent Streamlit UI Requirements
+streamlit>=1.32.0
+openai>=1.0.0
+litellm>=1.57.0
+pandas>=2.0.0
+numpy>=1.24.0
+plotly>=5.18.0

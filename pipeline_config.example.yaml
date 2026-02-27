@@ -1,0 +1,70 @@
+# ============================================================
+# EnsAgent Pipeline Configuration
+# ============================================================
+# Copy this file to `pipeline_config.yaml` and edit the values.
+# When `python endtoend.py` is run without CLI arguments it
+# loads `pipeline_config.yaml` from the repository root.
+# CLI arguments always override values set here.
+# ============================================================
+
+# === Required =================================================
+data_path: "Tool-runner/151507"      # example Visium directory in this repo
+sample_id: "DLPFC_151507"
+
+# === Pipeline Phase Toggles ===================================
+skip_tool_runner: false          # true  -> skip Stage A (Tool-runner)
+skip_scoring: false              # true  -> skip Stage B (Scoring)
+run_best: true                   # true  -> run  Stage C (BEST builder)
+run_annotation_multiagent: true  # true  -> run  Stage D (Multi-agent annotation)
+
+# === Tool-Runner Parameters ===================================
+n_clusters: 7
+random_seed: 2023
+methods:
+  - IRIS
+  - BASS
+  - DR-SC
+  - BayesSpace
+  - SEDR
+  - GraphST
+  - STAGATE
+  - stLearn
+
+# === Path Overrides (leave empty to use defaults) =============
+tool_output_dir: "output/tool_runner/DLPFC_151507"
+best_output_dir: "output/best/DLPFC_151507"
+
+# === Scoring ==================================================
+overwrite_staging: false         # overwrite files in scoring/input when staging
+vlm_off: false                   # true -> disable visual-score integration (pic_analyze)
+
+# === BEST Builder =============================================
+best_smooth_knn: false
+best_truth_file: "Tool-runner/151507/151507_truth.txt"  # optional truth file (spot_id<TAB>label) for ARI
+
+# === Environment ==============================================
+conda_exe: "mamba"               # "mamba" (recommended) or "conda", or full path
+env_names:
+  R: "R"
+  PY: "PY"
+  PY2: "PY2"
+
+# === Streamlit API Settings (written by Settings page) ==============
+# These generic fields are used by the Streamlit UI runtime.
+# For Azure endpoints, matching azure_* fields below are also supported.
+api_provider: ""                # e.g. azure, openai, anthropic, openrouter
+api_key: ""                     # keep local only; do not commit secrets
+api_endpoint: ""                # e.g. https://<resource>.openai.azure.com/
+api_version: ""                 # e.g. 2024-12-01-preview
+api_model: ""                   # canonical model/deployment field, e.g. gpt-4o / claude-3-5-sonnet-latest
+api_deployment: ""              # legacy alias (kept for backward compatibility)
+
+# === Azure OpenAI API (for Scoring & Annotation) =============
+# Prefer setting environment variables instead of storing keys here.
+#   AZURE_OPENAI_KEY, AZURE_OPENAI_ENDPOINT,
+#   AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_API_VERSION
+# Uncomment and fill in only if you cannot use env vars:
+# azure_openai_key: ""
+# azure_endpoint: ""
+# azure_deployment: "gpt-4o"
+# azure_api_version: "2024-12-01-preview"

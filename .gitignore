@@ -1,0 +1,140 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+ENV/
+package RAG test/RAG_test/
+Score Rag/socre_rag/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.*
+api_config.py
+.streamlit_config.json
+pipeline_config.yaml
+
+# Chat history cache
+.chat_history/
+chat_history/
+
+# Logs
+*.log
+logs/
+output_log/
+Score Rag/logs/
+Score Rag/output_log/
+EnsAgent/output_log/
+EnsAgent/scoring/output_log/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Project specific directories
+cache/
+Score Rag/cache/
+output/
+Score Rag/output/
+EnsAgent/output/
+EnsAgent/scoring/output/
+EnsAgent/scoring/cache/
+EnsAgent/scoring/pic_analyze/output/
+EnsAgent/output/best/
+EnsAgent/output/tool_runner/
+Tool-runner/151507/
+ARI&Picture_*/
+scoring/input/
+scoring/output/
+scoring/pic_analyze/uploads/
+scoring/pic_analyze/output/
+.worktrees/
+worktrees/
+Tool-runner/.git_toolrunner_backup/
+
+# Temporary files and scripts
+/temp_*
+/test_*
+/debug_*
+/quick_*
+/fix_*
+/add_*
+/remove_*
+/diagnose_*
+/verify_*
+
+# Data files (uncomment if you don't want to track data)
+# *.csv
+# *.json
+# *.xlsx
+# *.pkl
+
+# Large example binaries / Visium raw data (keep in examples/ externally)
+**/filtered_feature_bc_matrix.h5
+**/*.h5ad
+**/*.rds
+**/spatial/tissue_*.png
+**/spatial/tissue_*.jpg
+**/spatial/tissue_*.jpeg
+**/spatial/tissue_*.tif
+**/spatial/tissue_*.tiff
+
+# Model and vector database files
+vector_db/
+Score Rag/vector_db/
+*.model
+*.bin
+chromadb/
+**/chroma.sqlite3
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation build
+docs/_build/
+site/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/

@@ -1,0 +1,23 @@
+langchain
+openai==1.109.1
+pandas
+gseapy
+scikit-learn
+SQLAlchemy
+requests
+numpy
+scipy
+tqdm
+matplotlib
+tenacity==8.5.0
+langchain-openai==0.1.0
+seaborn
+langchain-community
+chromadb
+jinja2
+scanpy
+anndata 
+sentence-transformers 
+# 图片处理相关依赖已移除
+# pillow
+# azure-ai-vision

@@ -1,0 +1,37 @@
+# Cursor Ignore File for Score Project
+# This file tells Cursor which files and directories to ignore during indexing
+
+# =============================================================================
+# Python Environment and Dependencies
+# =============================================================================
+venv/
+Score Rag/score_rag/
+Score Rag 151673/score_rag/
+Score Rag 151669/score_rag/
+Human BC/score_rag/
+Human BC20/score_rag/
+Mouse olfactory Bulb/score_rag/
+Bladder/score_rag/
+EnsAgent/scoring/score_rag/
+score_env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+

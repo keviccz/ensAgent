@@ -1,0 +1,382 @@
+"""
+Chat interface component for EnsAgent.
+Implements a ChatGPT-style conversational UI with streaming output,
+JSON export, and conversation management.
+"""
+from __future__ import annotations
+
+import html
+import json
+import time
+import streamlit as st
+
+from ensagent_tools import execute_tool, load_config
+from streamlit_app.utils.state import (
+    get_state,
+    set_state,
+    add_message,
+    start_new_conversation,
+    ChatMessage,
+    ReasoningStep,
+)
+from streamlit_app.utils.api import EnsAgentAPI, APIError, ENSAGENT_TOOLS
+
+
+def _safe_html_text(text: str) -> str:
+    return html.escape(str(text), quote=False).replace("\n", "<br/>")
+
+
+def render_chat_interface() -> None:
+    """Render the main chat interface."""
+    messages_container = st.container()
+
+    pending_prompt = get_state("pending_prompt")
+    user_input = st.chat_input(
+        placeholder="Ask a question or give a command...",
+        key="chat_input",
+    )
+
+    with messages_container:
+        _render_message_history()
+
+        if pending_prompt and not user_input:
+            set_state("pending_prompt", None)
+            user_input = pending_prompt
+        if user_input:
+            _handle_user_input(user_input)
+
+
+def _render_message_history() -> None:
+    """Render the chat message history."""
+    messages = get_state("messages", [])
+
+    if not messages:
+        st.markdown(
+            """
+            <div class="ens-hero">
+                <div class="ens-hero-icon">🧬</div>
+                <div class="ens-hero-title">Welcome to EnsAgent</div>
+                <p class="ens-hero-subtitle">
+                    transcriptomics analysis with multi-agent reasoning, consensus scoring, and BEST domain construction
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        with st.container():
+            st.markdown('<div class="ens-chip-actions-anchor"></div>', unsafe_allow_html=True)
+            chip_labels = [
+                "Run end-to-end analysis",
+                "Check environment status",
+                "Show current config",
+            ]
+            _, col1, col2, col3, _ = st.columns([0.3, 1, 1, 1, 0.3])
+            for col, label in zip([col1, col2, col3], chip_labels):
+                with col:
+                    if st.button(label, key=f"chip_{label}", type="secondary", use_container_width=True):
+                        set_state("pending_prompt", label)
+                        st.rerun()
+        return
+
+    for msg in messages:
+        _render_message(msg)
+
+
+def _render_message(msg: ChatMessage) -> None:
+    """Render a single chat message with proper alignment."""
+    if msg.role == "user":
+        safe_content = _safe_html_text(msg.content)
+        st.markdown(
+            f"""
+            <div class="user-message-container">
+                <div class="user-message">{safe_content}</div>
+                <div class="user-avatar">👤</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    elif msg.role == "assistant":
+        safe_content = _safe_html_text(msg.content)
+        st.markdown(
+            f"""
+            <div class="assistant-message-container">
+                <div class="assistant-avatar">🤖</div>
+                <div class="assistant-message">{safe_content}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    elif msg.role == "system":
+        st.warning(msg.content)
+
+
+def _handle_user_input(user_input: str) -> None:
+    """Handle user input with streaming response."""
+    if not get_state("current_conversation_id"):
+        start_new_conversation()
+
+    add_message("user", user_input)
+
+    safe_user_input = _safe_html_text(user_input)
+    st.markdown(
+        f"""
+        <div class="user-message-container">
+            <div class="user-message">{safe_user_input}</div>
+            <div class="user-avatar">👤</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    response_placeholder = st.empty()
+
+    response_placeholder.markdown(
+        """
+        <div class="assistant-message-container">
+            <div class="assistant-avatar">🤖</div>
+            <div class="assistant-message"><span class="blinking-cursor">▌</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    try:
+        full_response = _generate_response_streaming(user_input, response_placeholder)
+        add_message("assistant", full_response)
+        st.rerun()
+
+    except Exception as e:
+        error_msg = f"Error: {str(e)}"
+        response_placeholder.markdown(
+            f"""
+            <div class="assistant-message-container">
+                <div class="assistant-avatar">🤖</div>
+                <div class="assistant-message">{error_msg}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        add_message("system", error_msg)
+
+
+def _generate_response_streaming(user_input: str, placeholder) -> str:
+    """Generate response with streaming effect."""
+    model_name = get_state("api_model") or get_state("api_deployment") or get_state("model_name", "gpt-4o")
+    provider = get_state("api_provider")
+
+    api = EnsAgentAPI(model=model_name, provider=provider or "")
+
+    if not api.initialize():
+        response = _prepend_local_fallback_notice(
+            _get_fallback_response(user_input),
+            reason="API not configured in Settings",
+        )
+        return _stream_text(response, placeholder)
+
+    sample_id = get_state("sample_id") or ""
+    data_path = get_state("data_path", "")
+
+    system_prompt = f"""\
+You are EnsAgent, a specialist assistant for spatial transcriptomics ensemble analysis.
+
+## What You Do
+You orchestrate a four-stage pipeline that integrates eight spatial clustering methods \
+(IRIS, BASS, DR-SC, BayesSpace, SEDR, GraphST, STAGATE, stLearn) to produce consensus \
+domain labels from 10X Visium data.
+
+## Pipeline Stages
+  A. Tool-Runner  — Run clustering in R/PY/PY2 environments, align labels, produce CSVs.
+  B. Scoring      — LLM-driven per-domain evaluation, build score & label matrices.
+  C. BEST Builder — Select best label per spot, output BEST_* files + result image.
+  D. Annotation   — Multi-agent (VLM + Peer + Critic) domain annotation.
+
+Stages depend on each other: A → B → C → D.
+
+## Current Configuration
+- Sample ID : {sample_id or '(not set)'}
+- Data Path : {data_path or '(not set)'}
+
+## Available Tools
+check_envs, setup_envs, run_tool_runner, run_scoring, run_best_builder, \
+run_annotation, run_end_to_end, show_config, set_config.
+
+## Policies
+- Before running, verify config is set. If data_path or sample_id are empty, ask the user.
+- Before the first run, check environments.
+- Explain what each stage will do before launching it.
+- When a tool fails, report the error clearly and suggest a fix.
+- Respond in the same language the user writes in.
+- Be concise. Use structured lists."""
+
+    api_messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_input},
+    ]
+
+    try:
+        max_tool_rounds = 8
+        for round_idx in range(max_tool_rounds):
+            result = api.chat(
+                messages=api_messages,
+                tools=ENSAGENT_TOOLS,
+                temperature=get_state("temperature", 0.7),
+                top_p=get_state("top_p", 1.0),
+                max_tokens=get_state("max_tokens", 4096),
+            )
+
+            content = result.get("content", "") or ""
+            tool_calls = result.get("tool_calls") or []
+
+            if not tool_calls:
+                final_content = content or _prepend_local_fallback_notice(
+                    _get_fallback_response(user_input),
+                    reason="model returned empty content",
+                )
+                return _stream_text(final_content, placeholder)
+
+            cfg = load_config()
+            normalized_tool_calls = []
+            for tool_idx, tc in enumerate(tool_calls):
+                tc_id = str(tc.get("id") or f"tool_{round_idx}_{tool_idx}")
+                name = str(tc.get("name") or "")
+                arguments = tc.get("arguments") or {}
+                if not isinstance(arguments, dict):
+                    arguments = {"raw": str(arguments)}
+
+                normalized_tool_calls.append(
+                    {
+                        "id": tc_id,
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "arguments": json.dumps(arguments, ensure_ascii=False),
+                        },
+                    }
+                )
+
+            api_messages.append(
+                {
+                    "role": "assistant",
+                    "content": content,
+                    "tool_calls": normalized_tool_calls,
+                }
+            )
+
+            for tc in normalized_tool_calls:
+                function = tc["function"]
+                name = function["name"]
+                try:
+                    args = json.loads(function["arguments"]) if function.get("arguments") else {}
+                except Exception:
+                    args = {}
+
+                out = execute_tool(name, args, cfg)
+                tool_response = json.dumps(out, ensure_ascii=False, default=str)
+                api_messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": tool_response,
+                    }
+                )
+                # set_config may change on-disk pipeline config; reload before next tool.
+                if name == "set_config":
+                    cfg = load_config()
+
+        loop_content = _prepend_local_fallback_notice(
+            _get_fallback_response(user_input),
+            reason="tool-call loop reached maximum rounds",
+        )
+        return _stream_text(loop_content, placeholder)
+
+    except Exception as exc:
+        response = _prepend_local_fallback_notice(
+            _get_fallback_response(user_input),
+            reason=f"request failed ({type(exc).__name__})",
+        )
+        return _stream_text(response, placeholder)
+
+
+def _stream_text(text: str, placeholder) -> str:
+    """Stream text in small chunks to reduce layout jitter."""
+    displayed = ""
+
+    words = text.split(" ")
+    chunk_size = 3
+    for i in range(0, len(words), chunk_size):
+        displayed = " ".join(words[: i + chunk_size])
+
+        safe_displayed = _safe_html_text(displayed)
+        placeholder.markdown(
+            f"""
+            <div class="assistant-message-container">
+                <div class="assistant-avatar">🤖</div>
+                <div class="assistant-message">{safe_displayed}<span class="blinking-cursor">▌</span></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        time.sleep(0.015)
+
+    safe_displayed = _safe_html_text(displayed)
+    placeholder.markdown(
+        f"""
+        <div class="assistant-message-container">
+            <div class="assistant-avatar">🤖</div>
+            <div class="assistant-message">{safe_displayed}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    return displayed
+
+
+def _prepend_local_fallback_notice(text: str, *, reason: str) -> str:
+    """Attach an explicit notice when response is local fallback."""
+    return f"[Local fallback reply: {reason}]\n\n{text}"
+
+
+def _get_fallback_response(user_input: str) -> str:
+    """Generate a fallback response without API."""
+    input_lower = user_input.lower()
+
+    if any(x in input_lower for x in ["run", "execute", "start"]):
+        if "end-to-end" in input_lower or "end to end" in input_lower or "pipeline" in input_lower:
+            return "I'll run the end-to-end pipeline. Configure Data Path and Sample ID in Settings first, then use the chat quick action: Run end-to-end analysis."
+        if "tool" in input_lower or "cluster" in input_lower:
+            return "I'll run the Tool Runner for spatial clustering. Make sure your conda environments are set up first."
+
+    if any(x in input_lower for x in ["check", "status", "env"]):
+        return "Use the chat quick action: Check environment status. This verifies whether R, PY, and PY2 conda environments are configured."
+
+    if any(x in input_lower for x in ["config", "setting", "show"]):
+        return """Your current configuration is available on the Settings page. Key settings include:
+- **Data Path**: Location of your spatial transcriptomics data
+- **Sample ID**: Unique identifier for your sample
+- **Deployment**: The LLM deployment used for agent reasoning"""
+
+    if any(x in input_lower for x in ["help", "what can", "how to"]):
+        return """I can help you with:
+
+**Pipeline Operations**
+- Run end-to-end analysis
+- Execute individual pipeline stages (Tool Runner, Scoring, BEST, Annotation)
+
+**Configuration**
+- Set up conda environments
+- Configure data paths and sample IDs
+
+**Analysis**
+- View spatial clustering results
+- Check domain annotations
+
+Just tell me what you'd like to do!"""
+
+    return f"I understand you're asking about: \"{user_input}\"\n\nFor full functionality, configure API credentials in Settings. In the meantime, you can use the chat quick actions to run pipeline operations."
+
+
+def process_pending_response() -> None:
+    """Legacy function - no longer needed with streaming."""
+    pass

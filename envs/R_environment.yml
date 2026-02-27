@@ -1,0 +1,73 @@
+name: R
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  # ---------- Core ----------
+  - python=3.11.3
+  - pip
+  - git
+
+  # ---------- R ----------
+  # 放宽一点，让 solver 选择与 rpy2 / Seurat 兼容的版本（通常会落在 4.4/4.5）
+  - r-base>=4.4,<4.6
+  - r-seurat=5.3.0
+  - r-seuratobject=5.1.0
+  - r-reticulate
+  - r-irkernel
+  - r-devtools
+  - r-tidyverse
+
+  # rpy2：Windows 用 conda 安装，避免 pip 在本机编译失败
+  - rpy2=3.6.4
+
+  # ---------- Python scientific stack (SEDR-compatible pins) ----------
+  - numpy=1.24.3
+  - pandas=2.0.1
+  - scipy=1.10.1
+  - scikit-learn=1.2.2
+  - scanpy=1.9.3
+  - anndata=0.9.1
+  - matplotlib=3.7.1
+  - seaborn=0.12.2
+  - tqdm=4.65.0
+
+  # scanpy 常用依赖
+  - h5py
+  - numba
+  - umap-learn
+  - pynndescent
+  - python-igraph
+  - leidenalg
+
+  # ---------- Jupyter ----------
+  - jupyterlab
+  - notebook
+  - ipykernel
+  - ipywidgets
+
+  # ---------- Utilities ----------
+  - openpyxl=3.1.5
+  - pyyaml
+  - requests
+  - networkx
+  - jinja2
+  - filelock
+  - typing-extensions
+  - sympy<1.13
+
+  # ---------- pip packages ----------
+  - pip:
+      # PyTorch 2.0.1 官方配套
+      - torch==2.0.1
+      - torchvision==0.15.2
+      - torchaudio==2.0.2
+
+      # Windows 平台这里用 pip（conda 通道平台支持受限）
+      - gseapy==1.1.9
+      - scikit-misc==0.3.1
+
+      # SEDR：从 GitHub 安装（不是 PyPI 的 sedr==1.0.0）
+      - git+https://github.com/JinmiaoChenLab/SEDR.git
