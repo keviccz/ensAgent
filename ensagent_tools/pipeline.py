@@ -97,26 +97,30 @@ def run_full_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
             results["ok"] = False
             return results
 
-    # --- Staging ---
-    try:
-        stage_toolrunner_outputs(
-            tool_output_dir=tool_out,
-            scoring_input_dir=scoring_input,
-            sample_id=cfg.sample_id,
-            overwrite=cfg.overwrite_staging,
-        )
-    except Exception as e:
-        results["phases"]["staging"] = {"ok": False, "error": str(e)}
-        results["ok"] = False
-        return results
-
     # --- Stage B: Scoring ---
     if not cfg.skip_scoring:
+        # --- Staging (only required before scoring) ---
+        try:
+            stage_toolrunner_outputs(
+                tool_output_dir=tool_out,
+                scoring_input_dir=scoring_input,
+                sample_id=cfg.sample_id,
+                overwrite=cfg.overwrite_staging,
+            )
+            results["phases"]["staging"] = {"ok": True}
+        except Exception as e:
+            results["phases"]["staging"] = {"ok": False, "error": str(e)}
+            results["ok"] = False
+            return results
+
         res = run_scoring(cfg)
         results["phases"]["scoring"] = res
         if not res["ok"]:
             results["ok"] = False
             return results
+    else:
+        results["phases"]["staging"] = {"ok": True, "skipped": True, "reason": "skip_scoring=true"}
+        results["phases"]["scoring"] = {"ok": True, "skipped": True}
 
     # --- Stage C: BEST builder ---
     if cfg.run_best:

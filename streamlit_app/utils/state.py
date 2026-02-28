@@ -134,6 +134,10 @@ def init_session_state() -> None:
         "active_page": "chat",
         "active_tab": "Overview",
         "pending_prompt": None,
+        "pending_user_input": None,
+        "pending_request_conversation_id": None,
+        "pending_response_inflight": False,
+        "pending_response_job_id": None,
     }
     
     for key, value in defaults.items():
@@ -193,10 +197,40 @@ def add_message(role: str, content: str, reasoning_steps: Optional[List[Reasonin
                 break
 
 
+def _is_empty_conversation(conv: Conversation) -> bool:
+    """Return True when conversation has no messages."""
+    return len(conv.messages) == 0
+
+
+def _prune_redundant_empty_conversations(*, keep_id: str | None = None) -> None:
+    """Drop redundant empty conversations (except ``keep_id``) from memory and disk."""
+    kept: list[Conversation] = []
+    for conv in st.session_state.get("conversations", []):
+        if conv.id == keep_id or not _is_empty_conversation(conv):
+            kept.append(conv)
+            continue
+        delete_conversation_from_disk(conv.id)
+    st.session_state.conversations = kept
+
+
 def start_new_conversation() -> str:
     """Start a new conversation and return its ID."""
-    if st.session_state.messages and st.session_state.current_conversation_id:
+    current_id = st.session_state.get("current_conversation_id")
+    current_conv: Conversation | None = None
+    if current_id:
+        for conv in st.session_state.get("conversations", []):
+            if conv.id == current_id:
+                current_conv = conv
+                break
+
+    # Reuse the active empty conversation to avoid duplicate blank history items
+    if current_id and current_conv and _is_empty_conversation(current_conv) and not st.session_state.messages:
+        return current_id
+
+    if st.session_state.messages and current_id:
         _save_current_conversation(touch_updated_at=False)
+
+    _prune_redundant_empty_conversations(keep_id=current_id)
 
     conv_id = str(uuid.uuid4())[:8]
     conv = Conversation(

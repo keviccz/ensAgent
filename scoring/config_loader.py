@@ -137,27 +137,19 @@ def get_legacy_config():
     try:
         # 避免循环导入
         import config as config_module
+        provider = str(getattr(config_module, "API_PROVIDER", "") or "").strip().lower()
+        if provider and provider != "azure":
+            # Non-Azure providers are now supported by the unified runtime.
+            return "", "", str(getattr(config_module, "API_MODEL", "gpt-4o") or "gpt-4o"), ""
+
         key = getattr(config_module, "AZURE_OPENAI_KEY", "") or ""
         endpoint = getattr(config_module, "AZURE_ENDPOINT", "") or ""
         deployment = getattr(config_module, "AZURE_DEPLOYMENT", "gpt-4") or "gpt-4"
         version = getattr(config_module, "AZURE_API_VERSION", "2024-12-01-preview") or "2024-12-01-preview"
-
-        # Even when config.py exists, require non-empty credentials.
-        if not key:
-            raise ValueError("AZURE_OPENAI_KEY is required but missing/empty in config.py and environment variables!")
-        if not endpoint:
-            raise ValueError("AZURE_OPENAI_ENDPOINT is required but missing/empty in config.py and environment variables!")
-
         return key, endpoint, deployment, version
     except ImportError:
         key = os.getenv("AZURE_OPENAI_KEY", "")
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
         deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4")
         version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
-        
-        if not key:
-            raise ValueError("AZURE_OPENAI_KEY is required but not found in environment variables!")
-        if not endpoint:
-            raise ValueError("AZURE_OPENAI_ENDPOINT is required but not found in environment variables!")
-        
         return key, endpoint, deployment, version 

@@ -56,7 +56,7 @@ TOOL_SCHEMAS: List[Dict[str, Any]] = [
                 "properties": {
                     "data_path": {"type": "string", "description": "Path to Visium data directory."},
                     "sample_id": {"type": "string", "description": "Sample identifier."},
-                    "n_clusters": {"type": "integer", "description": "Number of clusters.", "default": 7},
+                    "n_clusters": {"type": "integer", "description": "Number of clusters."},
                     "methods": {
                         "type": "array",
                         "items": {"type": "string"},

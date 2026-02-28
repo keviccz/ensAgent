@@ -5,7 +5,11 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from werkzeug.utils import secure_filename
 from PIL import Image
-from config import Config
+
+try:
+    from .config import Config
+except Exception:  # pragma: no cover - script-mode fallback
+    from config import Config
 
 class ImageManager:
     """图片管理器，负责图片的存储、管理和操作"""

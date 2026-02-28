@@ -297,19 +297,36 @@ class EnsAgentAPI:
             return True
 
         self.provider = _normalize_provider(self.provider)
-        
-        key, endpoint, api_version, model, provider = _get_api_credentials()
-        
-        if not self.api_key:
-            self.api_key = key
-        if not self.endpoint:
-            self.endpoint = endpoint
-        if not self.model:
-            self.model = model
+
+        provider_needs_endpoint = self.provider in {"others", "openai_compatible", "azure"}
+        has_explicit_credentials = bool(
+            self.api_key
+            and self.model
+            and self.provider
+            and (self.endpoint or not provider_needs_endpoint)
+        )
+        if not has_explicit_credentials:
+            key, endpoint, api_version, model, provider = _get_api_credentials()
+
+            if not self.api_key:
+                self.api_key = key
+            if not self.endpoint:
+                self.endpoint = endpoint
+            if not self.model:
+                self.model = model
+            if not self.provider:
+                self.provider = _normalize_provider(provider)
+            if not self.api_version:
+                self.api_version = api_version
+
         if not self.provider:
-            self.provider = _normalize_provider(provider)
+            self.provider = "openai"
         if not self.api_version:
-            self.api_version = api_version
+            self.api_version = (
+                os.environ.get("AZURE_OPENAI_API_VERSION")
+                or os.environ.get("AZURE_API_VERSION")
+                or "2024-12-01-preview"
+            )
 
         # Custom OpenAI-compatible mode requires endpoint.
         if not self.api_key:

@@ -15,6 +15,7 @@ from domain_evaluator import DomainEvaluator
 from input_handler import load_and_validate_inputs
 from output_handler import write_output
 from logger import Logger
+from cli_selectors import parse_selector_overrides
 # 导入构建矩阵的功能
 from typing import List, Dict
 from sklearn.preprocessing import MinMaxScaler
@@ -23,22 +24,47 @@ from decimal import Decimal, getcontext
 # 安全地导入配置，兼容有无config.py文件的情况
 from config_loader import get_legacy_config
 try:
-    AZURE_OPENAI_KEY, AZURE_ENDPOINT, AZURE_DEPLOYMENT, AZURE_API_VERSION = get_legacy_config()
-except ValueError as e:
-    print(f"[Error] Configuration error: {e}")
-    print("Please set environment variables or create config.py file.")
-    print("See README.md for configuration instructions.")
-    exit(1)
+    from config import load_config as load_scoring_config
+except Exception:
+    load_scoring_config = None
+try:
+    from provider_runtime import resolve_provider_config
+except Exception:
+    from scoring.provider_runtime import resolve_provider_config  # type: ignore
 
-# 默认API参数
-DEFAULT_OPENAI_KEY = AZURE_OPENAI_KEY
-DEFAULT_AZURE_ENDPOINT = AZURE_ENDPOINT
-DEFAULT_AZURE_DEPLOYMENT = AZURE_DEPLOYMENT
-DEFAULT_AZURE_API_VERSION = AZURE_API_VERSION
+AZURE_OPENAI_KEY, AZURE_ENDPOINT, AZURE_DEPLOYMENT, AZURE_API_VERSION = get_legacy_config()
+DEFAULT_API_PROVIDER = ""
+DEFAULT_API_KEY = ""
+DEFAULT_API_ENDPOINT = ""
+DEFAULT_API_VERSION = ""
+DEFAULT_API_MODEL = ""
+if load_scoring_config is not None:
+    try:
+        _cfg_defaults = load_scoring_config()
+        DEFAULT_API_PROVIDER = str(getattr(_cfg_defaults, "api_provider", "") or "")
+        DEFAULT_API_KEY = str(getattr(_cfg_defaults, "api_key", "") or "")
+        DEFAULT_API_ENDPOINT = str(getattr(_cfg_defaults, "api_endpoint", "") or "")
+        DEFAULT_API_VERSION = str(getattr(_cfg_defaults, "api_version", "") or "")
+        DEFAULT_API_MODEL = str(getattr(_cfg_defaults, "api_model", "") or "")
+        AZURE_OPENAI_KEY = str(getattr(_cfg_defaults, "azure_openai_key", "") or AZURE_OPENAI_KEY)
+        AZURE_ENDPOINT = str(getattr(_cfg_defaults, "azure_endpoint", "") or AZURE_ENDPOINT)
+        AZURE_DEPLOYMENT = str(getattr(_cfg_defaults, "azure_deployment", "") or AZURE_DEPLOYMENT)
+        AZURE_API_VERSION = str(getattr(_cfg_defaults, "azure_api_version", "") or AZURE_API_VERSION)
+    except Exception:
+        pass
+DEFAULT_OPENAI_KEY = DEFAULT_API_KEY or AZURE_OPENAI_KEY
+DEFAULT_AZURE_ENDPOINT = DEFAULT_API_ENDPOINT or AZURE_ENDPOINT
+DEFAULT_AZURE_DEPLOYMENT = DEFAULT_API_MODEL or AZURE_DEPLOYMENT
+DEFAULT_AZURE_API_VERSION = DEFAULT_API_VERSION or AZURE_API_VERSION
 
 # 解析命令行参数
 parser = argparse.ArgumentParser(description='DomainEvaluator Batch Runner')
 parser.add_argument('--output_format', type=str, default='json', choices=['json', 'dataframe', 'excel', 'sql', 'markdown'], help='输出格式，可选：json, dataframe(csv), excel(xlsx), sql, markdown(md)')
+parser.add_argument('--api_provider', type=str, default=DEFAULT_API_PROVIDER, help='通用provider（如 azure/openai/anthropic/openrouter）')
+parser.add_argument('--api_key', type=str, default=DEFAULT_API_KEY, help='通用provider API密钥')
+parser.add_argument('--api_endpoint', type=str, default=DEFAULT_API_ENDPOINT, help='通用provider endpoint/base URL')
+parser.add_argument('--api_version', type=str, default=DEFAULT_API_VERSION, help='通用provider API版本（Azure常用）')
+parser.add_argument('--api_model', type=str, default=DEFAULT_API_MODEL, help='通用provider 模型或部署名')
 parser.add_argument('--openai_key', type=str, default=DEFAULT_OPENAI_KEY, help='OpenAI或Azure OpenAI的API密钥')
 parser.add_argument('--azure_endpoint', type=str, default=DEFAULT_AZURE_ENDPOINT, help='Azure OpenAI endpoint')
 parser.add_argument('--azure_deployment', type=str, default=DEFAULT_AZURE_DEPLOYMENT, help='Azure OpenAI deployment名称')
@@ -83,6 +109,31 @@ parser.add_argument('--annotation_data_dir', type=str, default=None, help='Multi
 parser.add_argument('--annotation_sample_id', type=str, default=None, help='Multi-Agent Annotation 的 sample_id（用于定位 BEST_* 文件与 result.png）')
 
 args, unknown_args = parser.parse_known_args()
+
+effective_api = resolve_provider_config(
+    api_provider=args.api_provider,
+    api_key=args.api_key or args.openai_key,
+    api_endpoint=args.api_endpoint or args.azure_endpoint,
+    api_version=args.api_version or args.azure_api_version,
+    api_model=args.api_model or args.azure_deployment,
+    api_deployment=args.azure_deployment,
+    azure_openai_key=args.openai_key,
+    azure_endpoint=args.azure_endpoint,
+    azure_api_version=args.azure_api_version,
+    azure_deployment=args.azure_deployment,
+)
+args.api_provider = effective_api.provider
+args.api_key = effective_api.api_key
+args.api_endpoint = effective_api.endpoint
+args.api_version = effective_api.api_version
+args.api_model = effective_api.model
+
+# Keep legacy aliases for backward compatibility in downstream code.
+if args.api_provider == "azure":
+    args.openai_key = args.api_key
+    args.azure_endpoint = args.api_endpoint
+    args.azure_api_version = args.api_version
+    args.azure_deployment = args.api_model
 
 # 获取脚本所在目录，确保路径相对于脚本文件而不是工作目录
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -228,18 +279,7 @@ def clean_output_files(output_dir: str, log_func):
         log_func("没有找到需要清理的输出文件")
 
 # 解析形如 --domain2 / --method=IRIS 的参数，只对指定 domain / 方法 进行GPT打分
-selected_domains: List[int] = []
-selected_methods: List[str] = []
-for tok in unknown_args:
-    m_dom = re.match(r"--domain(\d+)$", tok)
-    m_method = re.match(r"--method=(\w+)$", tok)
-    if m_dom:
-        try:
-            selected_domains.append(int(m_dom.group(1)))
-        except ValueError:
-            continue
-    elif m_method:
-        selected_methods.append(m_method.group(1))
+selected_domains, selected_methods = parse_selector_overrides(unknown_args)
 
 if selected_domains:
     TARGET_DOMAINS = sorted(set(selected_domains))
@@ -340,16 +380,24 @@ if args.annotation_multiagent:
         log(f"[Info] 指定运行 Domains(来自 --domainX): {target_domains}")
 
     try:
-        from config import load_config
+        from config import load_config, ScoreRagConfig
         from annotation.annotation_multiagent.orchestrator import run_annotation_multiagent
 
-        cfg = load_config()
-        # Override credentials with CLI args if provided (keeps behavior consistent)
+        try:
+            cfg = load_config()
+        except Exception:
+            cfg = ScoreRagConfig.from_env()
+        # Override credentials with resolved provider args (legacy azure fields kept for compatibility).
         cfg = cfg.update(
-            azure_openai_key=args.openai_key,
-            azure_endpoint=args.azure_endpoint,
-            azure_deployment=args.azure_deployment,
-            azure_api_version=args.azure_api_version,
+            api_provider=args.api_provider,
+            api_key=args.api_key,
+            api_endpoint=args.api_endpoint,
+            api_version=args.api_version,
+            api_model=args.api_model,
+            azure_openai_key=args.openai_key if args.api_provider == "azure" else cfg.azure_openai_key,
+            azure_endpoint=args.azure_endpoint if args.api_provider == "azure" else cfg.azure_endpoint,
+            azure_deployment=args.azure_deployment if args.api_provider == "azure" else cfg.azure_deployment,
+            azure_api_version=args.azure_api_version if args.api_provider == "azure" else cfg.azure_api_version,
         )
 
         # Determine sample_id + data_dir (generalized; keeps legacy fallbacks).
@@ -450,8 +498,13 @@ log(f"共通过校验的样本数: {len(samples_list)}")
 # 初始化DomainEvaluator，负责大模型打分
 
 evaluator = DomainEvaluator(
-    openai_api_key=args.openai_key,
+    openai_api_key=args.api_key or args.openai_key,
     output_format=args.output_format,
+    api_provider=args.api_provider,
+    api_key=args.api_key,
+    api_endpoint=args.api_endpoint,
+    api_model=args.api_model,
+    api_version=args.api_version,
     azure_endpoint=args.azure_endpoint,
     azure_deployment=args.azure_deployment,
     azure_api_version=args.azure_api_version,

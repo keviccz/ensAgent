@@ -7,6 +7,8 @@ Checks, creates, and validates R / PY / PY2 environments.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
@@ -15,7 +17,76 @@ from ensagent_tools.config_manager import PipelineConfig
 
 
 def _conda(cfg: PipelineConfig) -> str:
-    return cfg.conda_exe or "mamba"
+    resolved = resolve_conda_executable(cfg)
+    return resolved.get("exe") or cfg.conda_exe or "mamba"
+
+
+def _normalize_candidate(value: str | None) -> str:
+    if not value:
+        return ""
+    return str(value).strip().strip('"').strip("'")
+
+
+def resolve_conda_executable(cfg: PipelineConfig) -> Dict[str, Any]:
+    """Resolve a usable conda/mamba executable from config, env vars, then PATH."""
+    configured = _normalize_candidate(cfg.conda_exe)
+    env_mamba = _normalize_candidate(os.environ.get("MAMBA_EXE"))
+    env_conda = _normalize_candidate(os.environ.get("CONDA_EXE"))
+
+    candidates: List[tuple[str, str]] = []
+    if configured:
+        candidates.append((configured, "config"))
+    if env_mamba:
+        candidates.append((env_mamba, "env:MAMBA_EXE"))
+    if env_conda:
+        candidates.append((env_conda, "env:CONDA_EXE"))
+    candidates.extend(
+        [
+            ("mamba", "path"),
+            ("mamba.exe", "path"),
+            ("mamba.bat", "path"),
+            ("conda", "path"),
+            ("conda.exe", "path"),
+            ("conda.bat", "path"),
+        ]
+    )
+
+    deduped: List[tuple[str, str]] = []
+    seen: set[str] = set()
+    for candidate, source in candidates:
+        key = candidate.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append((candidate, source))
+
+    checked: List[Dict[str, str]] = []
+    for candidate, source in deduped:
+        resolved = ""
+        cpath = Path(candidate)
+        if cpath.is_file():
+            resolved = str(cpath)
+        else:
+            found = shutil.which(candidate)
+            if found:
+                resolved = found
+        checked.append({"candidate": candidate, "source": source, "resolved": resolved})
+        if resolved:
+            return {
+                "ok": True,
+                "exe": resolved,
+                "source": source,
+                "requested": configured or cfg.conda_exe or "",
+                "checked": checked,
+            }
+
+    return {
+        "ok": False,
+        "exe": "",
+        "source": "",
+        "requested": configured or cfg.conda_exe or "",
+        "checked": checked,
+    }
 
 
 def _env_yml_dir(cfg: PipelineConfig) -> Path:
@@ -24,14 +95,25 @@ def _env_yml_dir(cfg: PipelineConfig) -> Path:
 
 def check_envs(cfg: PipelineConfig) -> Dict[str, Any]:
     """Check whether required environments exist via ``mamba/conda env list``."""
-    exe = _conda(cfg)
+    resolved = resolve_conda_executable(cfg)
+    exe = resolved.get("exe")
     out: Dict[str, Any] = {
-        "conda_exe": exe,
+        "requested_conda_exe": resolved.get("requested"),
+        "conda_exe": exe or "",
+        "conda_source": resolved.get("source", ""),
+        "resolver_checked": resolved.get("checked", []),
         "env_names": cfg.env_names,
         "found": {},
         "missing": [],
         "warnings": [],
     }
+
+    if not resolved.get("ok"):
+        out["warnings"].append(
+            "No usable conda/mamba executable found. "
+            "Checked config, MAMBA_EXE/CONDA_EXE, and PATH."
+        )
+        return {**out, "ok": False}
 
     try:
         p = subprocess.run(
@@ -62,7 +144,19 @@ def check_envs(cfg: PipelineConfig) -> Dict[str, Any]:
 
 def setup_envs(cfg: PipelineConfig) -> Dict[str, Any]:
     """Create missing environments from ``envs/*.yml``."""
-    exe = _conda(cfg)
+    resolved = resolve_conda_executable(cfg)
+    exe = resolved.get("exe")
+    if not resolved.get("ok") or not exe:
+        return {
+            "ok": False,
+            "error": (
+                "No usable conda/mamba executable found. "
+                "Checked config, MAMBA_EXE/CONDA_EXE, and PATH."
+            ),
+            "requested_conda_exe": resolved.get("requested"),
+            "resolver_checked": resolved.get("checked", []),
+        }
+
     yml_dir = _env_yml_dir(cfg)
     yml_map = {
         "R": yml_dir / "R_environment.yml",

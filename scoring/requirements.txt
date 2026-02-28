@@ -1,5 +1,6 @@
 langchain
 openai==1.109.1
+litellm>=1.57.0
 pandas
 gseapy
 scikit-learn

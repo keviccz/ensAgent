@@ -8,6 +8,11 @@ from __future__ import annotations
 import html
 import json
 import time
+import uuid
+from concurrent.futures import Future, ThreadPoolExecutor
+from threading import Lock
+from typing import Any, Dict
+
 import streamlit as st
 
 from ensagent_tools import execute_tool, load_config
@@ -16,41 +21,104 @@ from streamlit_app.utils.state import (
     set_state,
     add_message,
     start_new_conversation,
+    load_conversation,
     ChatMessage,
     ReasoningStep,
 )
 from streamlit_app.utils.api import EnsAgentAPI, APIError, ENSAGENT_TOOLS
 
 
+_RESPONSE_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ensagent-chat")
+_RESPONSE_JOBS: Dict[str, Future[str]] = {}
+_RESPONSE_JOBS_LOCK = Lock()
+
+
 def _safe_html_text(text: str) -> str:
     return html.escape(str(text), quote=False).replace("\n", "<br/>")
 
 
+def _build_runtime_snapshot() -> Dict[str, Any]:
+    """Snapshot runtime settings so background jobs do not depend on session state."""
+    model_name = get_state("api_model") or get_state("api_deployment") or get_state("model_name", "gpt-4o")
+    return {
+        "model_name": model_name,
+        "provider": get_state("api_provider") or "",
+        "api_key": get_state("api_key") or "",
+        "api_endpoint": get_state("api_endpoint") or "",
+        "api_version": get_state("api_version") or "",
+        "sample_id": get_state("sample_id") or "",
+        "data_path": get_state("data_path", "") or "",
+        "n_clusters": int(get_state("n_clusters", 7) or 7),
+        "temperature": float(get_state("temperature", 0.7)),
+        "top_p": float(get_state("top_p", 1.0)),
+        "max_tokens": int(get_state("max_tokens", 4096) or 4096),
+    }
+
+
+def _submit_response_job(user_input: str, runtime: Dict[str, Any]) -> str:
+    """Submit one background response job and return its id."""
+    job_id = uuid.uuid4().hex[:12]
+    future = _RESPONSE_EXECUTOR.submit(
+        _generate_response_streaming,
+        user_input,
+        None,
+        False,
+        runtime,
+    )
+    with _RESPONSE_JOBS_LOCK:
+        _RESPONSE_JOBS[job_id] = future
+    return job_id
+
+
+def _get_response_job(job_id: str | None) -> Future[str] | None:
+    if not job_id:
+        return None
+    with _RESPONSE_JOBS_LOCK:
+        return _RESPONSE_JOBS.get(job_id)
+
+
+def _clear_response_job(job_id: str | None) -> None:
+    if not job_id:
+        return
+    with _RESPONSE_JOBS_LOCK:
+        _RESPONSE_JOBS.pop(job_id, None)
+
+
+def _clear_pending_response_state() -> None:
+    set_state("pending_user_input", None)
+    set_state("pending_request_conversation_id", None)
+    set_state("pending_response_inflight", False)
+    set_state("pending_response_job_id", None)
+
+
 def render_chat_interface() -> None:
     """Render the main chat interface."""
-    messages_container = st.container()
-
     pending_prompt = get_state("pending_prompt")
     user_input = st.chat_input(
         placeholder="Ask a question or give a command...",
         key="chat_input",
     )
+    effective_input = user_input
+    if pending_prompt and not effective_input:
+        set_state("pending_prompt", None)
+        effective_input = pending_prompt
 
+    if effective_input:
+        _handle_user_input(effective_input)
+        return
+
+    messages_container = st.container()
     with messages_container:
         _render_message_history()
-
-        if pending_prompt and not user_input:
-            set_state("pending_prompt", None)
-            user_input = pending_prompt
-        if user_input:
-            _handle_user_input(user_input)
 
 
 def _render_message_history() -> None:
     """Render the chat message history."""
     messages = get_state("messages", [])
+    has_pending = bool(get_state("pending_user_input")) or bool(get_state("pending_response_inflight"))
 
-    if not messages:
+    if not messages and not has_pending:
+        st.markdown('<div class="ens-chat-empty-anchor"></div>', unsafe_allow_html=True)
         st.markdown(
             """
             <div class="ens-hero">
@@ -80,6 +148,20 @@ def _render_message_history() -> None:
 
     for msg in messages:
         _render_message(msg)
+
+    current_conv_id = get_state("current_conversation_id")
+    pending_conv_id = get_state("pending_request_conversation_id")
+    is_pending_here = bool(get_state("pending_response_inflight")) and current_conv_id and pending_conv_id == current_conv_id
+    if is_pending_here:
+        st.markdown(
+            """
+            <div class="assistant-message-container">
+                <div class="assistant-avatar">🤖</div>
+                <div class="assistant-message">EnsAgent is replying<span class="ens-streaming-indicator"> ...</span></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def _render_message(msg: ChatMessage) -> None:
@@ -113,70 +195,52 @@ def _render_message(msg: ChatMessage) -> None:
 
 
 def _handle_user_input(user_input: str) -> None:
-    """Handle user input with streaming response."""
+    """Queue a user message and process response in a page-independent phase."""
     if not get_state("current_conversation_id"):
         start_new_conversation()
 
+    stale_job_id = get_state("pending_response_job_id")
+    _clear_response_job(stale_job_id)
     add_message("user", user_input)
-
-    safe_user_input = _safe_html_text(user_input)
-    st.markdown(
-        f"""
-        <div class="user-message-container">
-            <div class="user-message">{safe_user_input}</div>
-            <div class="user-avatar">👤</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    response_placeholder = st.empty()
-
-    response_placeholder.markdown(
-        """
-        <div class="assistant-message-container">
-            <div class="assistant-avatar">🤖</div>
-            <div class="assistant-message"><span class="blinking-cursor">▌</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    try:
-        full_response = _generate_response_streaming(user_input, response_placeholder)
-        add_message("assistant", full_response)
-        st.rerun()
-
-    except Exception as e:
-        error_msg = f"Error: {str(e)}"
-        response_placeholder.markdown(
-            f"""
-            <div class="assistant-message-container">
-                <div class="assistant-avatar">🤖</div>
-                <div class="assistant-message">{error_msg}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        add_message("system", error_msg)
+    set_state("pending_user_input", user_input)
+    set_state("pending_request_conversation_id", get_state("current_conversation_id"))
+    set_state("pending_response_inflight", False)
+    set_state("pending_response_job_id", None)
+    st.rerun()
 
 
-def _generate_response_streaming(user_input: str, placeholder) -> str:
+def _generate_response_streaming(
+    user_input: str,
+    placeholder=None,
+    stream: bool = True,
+    runtime: Dict[str, Any] | None = None,
+) -> str:
     """Generate response with streaming effect."""
-    model_name = get_state("api_model") or get_state("api_deployment") or get_state("model_name", "gpt-4o")
-    provider = get_state("api_provider")
+    runtime_ctx = runtime or _build_runtime_snapshot()
+    model_name = runtime_ctx.get("model_name") or "gpt-4o"
+    provider = runtime_ctx.get("provider") or ""
+    temperature = float(runtime_ctx.get("temperature", 0.7) or 0.7)
+    top_p = float(runtime_ctx.get("top_p", 1.0) or 1.0)
+    max_tokens = int(runtime_ctx.get("max_tokens", 4096) or 4096)
 
-    api = EnsAgentAPI(model=model_name, provider=provider or "")
+    api = EnsAgentAPI(
+        model=model_name,
+        provider=provider or "",
+        api_key=str(runtime_ctx.get("api_key") or ""),
+        endpoint=str(runtime_ctx.get("api_endpoint") or ""),
+        api_version=str(runtime_ctx.get("api_version") or ""),
+    )
 
     if not api.initialize():
         response = _prepend_local_fallback_notice(
             _get_fallback_response(user_input),
             reason="API not configured in Settings",
         )
-        return _stream_text(response, placeholder)
+        return _stream_text(response, placeholder, stream=stream)
 
-    sample_id = get_state("sample_id") or ""
-    data_path = get_state("data_path", "")
+    sample_id = runtime_ctx.get("sample_id") or ""
+    data_path = runtime_ctx.get("data_path") or ""
+    n_clusters = int(runtime_ctx.get("n_clusters", 7) or 7)
 
     system_prompt = f"""\
 You are EnsAgent, a specialist assistant for spatial transcriptomics ensemble analysis.
@@ -197,6 +261,9 @@ Stages depend on each other: A → B → C → D.
 ## Current Configuration
 - Sample ID : {sample_id or '(not set)'}
 - Data Path : {data_path or '(not set)'}
+- n_clusters: {n_clusters}
+- Temperature: {temperature}
+- Top-p      : {top_p}
 
 ## Available Tools
 check_envs, setup_envs, run_tool_runner, run_scoring, run_best_builder, \
@@ -207,6 +274,7 @@ run_annotation, run_end_to_end, show_config, set_config.
 - Before the first run, check environments.
 - Explain what each stage will do before launching it.
 - When a tool fails, report the error clearly and suggest a fix.
+- When discussing runtime parameters (n_clusters, temperature, top_p), use current config or tool return values only.
 - Respond in the same language the user writes in.
 - Be concise. Use structured lists."""
 
@@ -221,9 +289,9 @@ run_annotation, run_end_to_end, show_config, set_config.
             result = api.chat(
                 messages=api_messages,
                 tools=ENSAGENT_TOOLS,
-                temperature=get_state("temperature", 0.7),
-                top_p=get_state("top_p", 1.0),
-                max_tokens=get_state("max_tokens", 4096),
+                temperature=temperature,
+                top_p=top_p,
+                max_tokens=max_tokens,
             )
 
             content = result.get("content", "") or ""
@@ -234,7 +302,7 @@ run_annotation, run_end_to_end, show_config, set_config.
                     _get_fallback_response(user_input),
                     reason="model returned empty content",
                 )
-                return _stream_text(final_content, placeholder)
+                return _stream_text(final_content, placeholder, stream=stream)
 
             cfg = load_config()
             normalized_tool_calls = []
@@ -289,18 +357,21 @@ run_annotation, run_end_to_end, show_config, set_config.
             _get_fallback_response(user_input),
             reason="tool-call loop reached maximum rounds",
         )
-        return _stream_text(loop_content, placeholder)
+        return _stream_text(loop_content, placeholder, stream=stream)
 
     except Exception as exc:
         response = _prepend_local_fallback_notice(
             _get_fallback_response(user_input),
             reason=f"request failed ({type(exc).__name__})",
         )
-        return _stream_text(response, placeholder)
+        return _stream_text(response, placeholder, stream=stream)
 
 
-def _stream_text(text: str, placeholder) -> str:
+def _stream_text(text: str, placeholder, *, stream: bool = True) -> str:
     """Stream text in small chunks to reduce layout jitter."""
+    if not stream or placeholder is None:
+        return text
+
     displayed = ""
 
     words = text.split(" ")
@@ -313,7 +384,7 @@ def _stream_text(text: str, placeholder) -> str:
             f"""
             <div class="assistant-message-container">
                 <div class="assistant-avatar">🤖</div>
-                <div class="assistant-message">{safe_displayed}<span class="blinking-cursor">▌</span></div>
+                <div class="assistant-message">{safe_displayed}<span class="ens-streaming-indicator"> ...</span></div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -378,5 +449,43 @@ Just tell me what you'd like to do!"""
 
 
 def process_pending_response() -> None:
-    """Legacy function - no longer needed with streaming."""
-    pass
+    """Process queued chat requests regardless of current page."""
+    pending_input = get_state("pending_user_input")
+    if not pending_input:
+        return
+
+    target_conv_id = get_state("pending_request_conversation_id")
+    if not target_conv_id:
+        _clear_pending_response_state()
+        return
+
+    job_id = get_state("pending_response_job_id")
+    future = _get_response_job(job_id)
+    if not job_id or future is None:
+        runtime = _build_runtime_snapshot()
+        new_job_id = _submit_response_job(pending_input, runtime)
+        set_state("pending_response_job_id", new_job_id)
+        set_state("pending_response_inflight", True)
+        return
+
+    if not future.done():
+        set_state("pending_response_inflight", True)
+        return
+
+    original_conv_id = get_state("current_conversation_id")
+    switched_context = False
+    try:
+        if original_conv_id != target_conv_id:
+            switched_context = load_conversation(target_conv_id)
+            if not switched_context:
+                raise RuntimeError(f"Conversation not found: {target_conv_id}")
+
+        full_response = future.result()
+        add_message("assistant", full_response)
+    except Exception as exc:
+        add_message("system", f"Error: {exc}")
+    finally:
+        _clear_response_job(job_id)
+        _clear_pending_response_state()
+        if switched_context and original_conv_id and original_conv_id != get_state("current_conversation_id"):
+            load_conversation(original_conv_id)

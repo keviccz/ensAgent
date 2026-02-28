@@ -19,6 +19,16 @@ class ProviderConfigurationTests(unittest.TestCase):
         detected = api_mod._detect_provider("https://openrouter.ai/api/v1")
         self.assertEqual(detected, "openrouter")
 
+    def test_provider_lock_enabled_when_endpoint_detects_provider(self) -> None:
+        locked, provider = settings_mod._resolve_provider_lock("https://abc.openai.azure.com/")
+        self.assertTrue(locked)
+        self.assertEqual(provider, "azure")
+
+    def test_provider_lock_disabled_when_endpoint_empty(self) -> None:
+        locked, provider = settings_mod._resolve_provider_lock("")
+        self.assertFalse(locked)
+        self.assertIsNone(provider)
+
     def test_read_pipeline_api_credentials_prefers_generic_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)

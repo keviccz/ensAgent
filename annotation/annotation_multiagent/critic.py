@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List
 
-from openai import AzureOpenAI
-
 from .llm_clients import chat_json
 from .schemas import AnnotationDraft, CriticOutput, ExpertOutput
 
@@ -18,7 +16,7 @@ def _load_kb_text(kb_path: str) -> str:
 
 
 def critic_agent(
-    client: AzureOpenAI,
+    client: Any,
     model: str,
     *,
     annotation: AnnotationDraft,
@@ -101,5 +99,4 @@ Rules:
         max_tokens=1600,
         temperature=0.2,
     )  # type: ignore[return-value]
-
 

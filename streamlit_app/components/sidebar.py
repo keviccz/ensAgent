@@ -80,6 +80,8 @@ def _init_from_pipeline_config() -> None:
         "data_path",
         "sample_id",
         "n_clusters",
+        "temperature",
+        "top_p",
         "api_provider",
         "api_key",
         "api_endpoint",
@@ -88,6 +90,10 @@ def _init_from_pipeline_config() -> None:
         "api_deployment",
     ]:
         val = loaded.get(key, "")
+        if key in {"n_clusters", "temperature", "top_p"}:
+            if val is not None and val != "":
+                set_state(key, val)
+            continue
         if val:
             set_state(key, val)
 
@@ -178,7 +184,7 @@ def _render_conversation_history() -> None:
             preview = conv.get_preview(36)
             is_active = conv.id == current_id
 
-            col_btn, col_menu = st.columns([5, 1], vertical_alignment="center")
+            col_btn, col_menu = st.columns([7.6, 1.0], vertical_alignment="center")
             with col_btn:
                 if st.button(
                     preview,
@@ -189,7 +195,8 @@ def _render_conversation_history() -> None:
                     _open_conversation_from_history(conv.id)
                     st.rerun()
             with col_menu:
-                with st.popover("...", use_container_width=True):
+                # Keep label empty so only Streamlit's right-side chevron is shown.
+                with st.popover("", use_container_width=True):
                     st.download_button(
                         "Export JSON",
                         data=export_conversation_json(conv),

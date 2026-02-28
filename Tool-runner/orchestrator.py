@@ -44,6 +44,9 @@ class ToolRunnerAgent:
             "status": "initialized",
             "methods_executed": [],
             "methods_failed": [],
+            "succeeded_analyses": [],
+            "failed_analyses": [],
+            "warnings": [],
             "output_files": {},
             "start_time": datetime.now().isoformat(),
         }
@@ -258,6 +261,9 @@ class ToolRunnerAgent:
             ("Pictures", "generate_pictures.py", output_dir / "PICTURES"),
         ]
 
+        succeeded_analyses = []
+        failed_analyses = []
+
         for name, script, out_dir in analyses:
             print(f"\nGenerating {name}...")
             script_path = str(postprocess_dir / script)
@@ -273,30 +279,43 @@ class ToolRunnerAgent:
             if result.returncode == 0:
                 print(f"✓ {name} generated successfully")
                 self.results["output_files"][name.lower()] = str(out_dir)
+                succeeded_analyses.append(name)
             else:
                 print(f"✗ {name} generation failed")
+                failed_analyses.append(name)
                 if result.stderr:
                     print(f"STDERR: {result.stderr}")
 
-        return True
+        self.results["succeeded_analyses"] = succeeded_analyses
+        self.results["failed_analyses"] = failed_analyses
+        return {
+            "all_ok": len(failed_analyses) == 0,
+            "succeeded_analyses": succeeded_analyses,
+            "failed_analyses": failed_analyses,
+        }
     
     def generate_report(self):
         """Generate execution report"""
         self.results['end_time'] = datetime.now().isoformat()
-        self.results['status'] = 'completed'
+        if self.results.get("status") in (None, "", "initialized"):
+            self.results["status"] = "completed"
         
         report_path = Path(self.config['output_dir']) / "tool_runner_report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
         with open(report_path, 'w') as f:
             json.dump(self.results, f, indent=2)
         
         print(f"\n{'#'*60}")
         print(f"# EXECUTION REPORT")
         print(f"{'#'*60}")
+        print(f"Status: {self.results.get('status')}")
         print(f"Sample: {self.results['sample_id']}")
         print(f"Methods executed: {len(self.results['methods_executed'])}/{len(self.config['methods'])}")
         print(f"  Successful: {', '.join(self.results['methods_executed'])}")
         if self.results['methods_failed']:
             print(f"  Failed: {', '.join(self.results['methods_failed'])}")
+        if self.results.get("failed_analyses"):
+            print(f"Downstream failed: {', '.join(self.results['failed_analyses'])}")
         print(f"\nOutput directory: {self.config['output_dir']}")
         print(f"Report saved to: {report_path}")
         print(f"{'#'*60}\n")
@@ -305,18 +324,45 @@ class ToolRunnerAgent:
         """Run the complete pipeline"""
         try:
             # Phase 1: Clustering
-            self.run_clustering_tools()
+            clustering_ok = self.run_clustering_tools()
+            if not clustering_ok:
+                raise RuntimeError("Clustering phase did not meet minimum success requirement")
             
             # Phase 2: Alignment
-            self.run_alignment()
+            alignment_ok = self.run_alignment()
+            if not alignment_ok:
+                raise RuntimeError("Alignment phase failed")
             
             # Phase 3: Downstream analysis
-            self.run_downstream_analysis()
+            downstream_result = self.run_downstream_analysis()
+            if isinstance(downstream_result, dict):
+                succeeded = downstream_result.get("succeeded_analyses", [])
+                failed = downstream_result.get("failed_analyses", [])
+                all_ok = bool(downstream_result.get("all_ok", not failed))
+                self.results["succeeded_analyses"] = list(succeeded)
+                self.results["failed_analyses"] = list(failed)
+            else:
+                all_ok = bool(downstream_result)
+                self.results["succeeded_analyses"] = self.results.get("succeeded_analyses", [])
+                self.results["failed_analyses"] = self.results.get("failed_analyses", [])
+
+            if all_ok:
+                self.results["status"] = "completed"
+            else:
+                self.results["status"] = "partial_success"
+                failed_analyses = self.results.get("failed_analyses", [])
+                if failed_analyses:
+                    warn = f"Downstream analyses failed: {', '.join(failed_analyses)}"
+                    self.results["warnings"].append(warn)
+                    print(f"\n[Warning] {warn}")
             
             # Generate report
             self.generate_report()
-            
-            print("\n✓ Pipeline completed successfully!\n")
+
+            if self.results["status"] == "completed":
+                print("\n✓ Pipeline completed successfully!\n")
+            else:
+                print("\n✓ Pipeline completed with partial success.\n")
             return True
             
         except Exception as e:
@@ -374,5 +420,4 @@ Examples:
 
 if __name__ == "__main__":
     main()
-
 

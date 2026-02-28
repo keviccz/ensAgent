@@ -10,7 +10,29 @@ from visual_score_integrator import VisualScoreIntegrator
 
 # 主类：DomainEvaluator
 class DomainEvaluator:
-    def __init__(self, openai_api_key: str, output_format: str = 'json', azure_endpoint: str = None, azure_deployment: str = None, azure_api_version: str = None, temperature: float = 0.2, max_completion_tokens: int = None, top_p: float = 1.0, frequency_penalty: float = 0.0, presence_penalty: float = 0.0, top_n_deg: int = 5, example_db: str = None, use_example_db: bool = False, knn_k: int = 5, enforce_discrimination: bool = False):
+    def __init__(
+        self,
+        openai_api_key: str,
+        output_format: str = 'json',
+        api_provider: str = "",
+        api_key: str = "",
+        api_endpoint: str = "",
+        api_model: str = "",
+        api_version: str = "",
+        azure_endpoint: str = None,
+        azure_deployment: str = None,
+        azure_api_version: str = None,
+        temperature: float = 0.2,
+        max_completion_tokens: int = None,
+        top_p: float = 1.0,
+        frequency_penalty: float = 0.0,
+        presence_penalty: float = 0.0,
+        top_n_deg: int = 5,
+        example_db: str = None,
+        use_example_db: bool = False,
+        knn_k: int = 5,
+        enforce_discrimination: bool = False,
+    ):
         """
         初始化DomainEvaluator
         :param openai_api_key: OpenAI API密钥
@@ -27,7 +49,12 @@ class DomainEvaluator:
         self.openai_api_key = openai_api_key
         self.output_format = output_format
         self.gpt_scorer = GPTDomainScorer(
-            openai_api_key=openai_api_key,
+            openai_api_key=api_key or openai_api_key,
+            api_provider=api_provider,
+            api_key=api_key or openai_api_key,
+            api_endpoint=api_endpoint or azure_endpoint,
+            api_model=api_model or azure_deployment,
+            api_version=api_version or azure_api_version,
             azure_endpoint=azure_endpoint,
             azure_deployment=azure_deployment,
             azure_api_version=azure_api_version,

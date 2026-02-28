@@ -29,6 +29,10 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 import yaml
+try:
+    from provider_runtime import normalize_provider, detect_provider, resolve_provider_config
+except Exception:
+    from scoring.provider_runtime import normalize_provider, detect_provider, resolve_provider_config  # type: ignore
 
 # ---------------------------------------------------------------------------
 # Hard-coded defaults
@@ -70,17 +74,35 @@ def _load_pipeline_raw() -> Dict[str, Any]:
 
 _pipeline_cfg = _load_pipeline_raw()
 _pipeline_endpoint = str(_pipeline_cfg.get("api_endpoint") or _pipeline_cfg.get("azure_endpoint") or "")
-_pipeline_provider = str(_pipeline_cfg.get("api_provider") or "").strip().lower()
+_pipeline_provider = normalize_provider(str(_pipeline_cfg.get("api_provider") or ""))
 _pipeline_is_azure = (
     _pipeline_provider == "azure"
     or "openai.azure.com" in _pipeline_endpoint.lower()
     or "cognitiveservices.azure.com" in _pipeline_endpoint.lower()
 )
 
+_effective_api = resolve_provider_config(
+    api_provider=_pipeline_provider,
+    api_key=str(_pipeline_cfg.get("api_key") or ""),
+    api_endpoint=str(_pipeline_cfg.get("api_endpoint") or ""),
+    api_version=str(_pipeline_cfg.get("api_version") or ""),
+    api_model=str(_pipeline_cfg.get("api_model") or _pipeline_cfg.get("api_deployment") or ""),
+    azure_openai_key=str(_pipeline_cfg.get("azure_openai_key") or ""),
+    azure_endpoint=str(_pipeline_cfg.get("azure_endpoint") or ""),
+    azure_api_version=str(_pipeline_cfg.get("azure_api_version") or ""),
+    azure_deployment=str(_pipeline_cfg.get("azure_deployment") or ""),
+)
+
+API_PROVIDER: str = os.getenv("ENSAGENT_API_PROVIDER", _effective_api.provider)
+API_KEY: str = os.getenv("ENSAGENT_API_KEY", _effective_api.api_key)
+API_ENDPOINT: str = os.getenv("ENSAGENT_API_ENDPOINT", _effective_api.endpoint)
+API_VERSION: str = os.getenv("ENSAGENT_API_VERSION", _effective_api.api_version)
+API_MODEL: str = os.getenv("ENSAGENT_API_MODEL", _effective_api.model)
+
 AZURE_OPENAI_KEY: str = os.getenv(
     "AZURE_OPENAI_KEY",
     str(
-        (_pipeline_cfg.get("api_key") if _pipeline_is_azure else "")
+        (API_KEY if API_PROVIDER == "azure" else "")
         or _pipeline_cfg.get("azure_openai_key")
         or (getattr(_api_cfg, "AZURE_OPENAI_KEY", _DEFAULT_KEY) if _api_cfg else _DEFAULT_KEY)
     ),
@@ -88,7 +110,7 @@ AZURE_OPENAI_KEY: str = os.getenv(
 AZURE_ENDPOINT: str = os.getenv(
     "AZURE_OPENAI_ENDPOINT",
     str(
-        (_pipeline_cfg.get("api_endpoint") if _pipeline_is_azure else "")
+        (API_ENDPOINT if API_PROVIDER == "azure" else "")
         or _pipeline_cfg.get("azure_endpoint")
         or (getattr(_api_cfg, "AZURE_OPENAI_ENDPOINT", _DEFAULT_ENDPOINT) if _api_cfg else _DEFAULT_ENDPOINT)
     ),
@@ -96,8 +118,7 @@ AZURE_ENDPOINT: str = os.getenv(
 AZURE_DEPLOYMENT: str = os.getenv(
     "AZURE_OPENAI_DEPLOYMENT",
     str(
-        (_pipeline_cfg.get("api_model") if _pipeline_is_azure else "")
-        or (_pipeline_cfg.get("api_deployment") if _pipeline_is_azure else "")
+        (API_MODEL if API_PROVIDER == "azure" else "")
         or _pipeline_cfg.get("azure_deployment")
         or (getattr(_api_cfg, "AZURE_OPENAI_DEPLOYMENT", _DEFAULT_DEPLOYMENT) if _api_cfg else _DEFAULT_DEPLOYMENT)
     ),
@@ -105,7 +126,7 @@ AZURE_DEPLOYMENT: str = os.getenv(
 AZURE_API_VERSION: str = os.getenv(
     "AZURE_OPENAI_API_VERSION",
     str(
-        (_pipeline_cfg.get("api_version") if _pipeline_is_azure else "")
+        (API_VERSION if API_PROVIDER == "azure" else "")
         or _pipeline_cfg.get("azure_api_version")
         or (getattr(_api_cfg, "AZURE_OPENAI_API_VERSION", _DEFAULT_API_VERSION) if _api_cfg else _DEFAULT_API_VERSION)
     ),
@@ -120,6 +141,11 @@ class ScoreRagConfig:
     """Score Rag 系统的统一配置类"""
     
     # === API配置 ===
+    api_provider: str = field(default_factory=lambda: API_PROVIDER)
+    api_key: str = field(default_factory=lambda: API_KEY)
+    api_endpoint: str = field(default_factory=lambda: API_ENDPOINT)
+    api_version: str = field(default_factory=lambda: API_VERSION)
+    api_model: str = field(default_factory=lambda: API_MODEL)
     azure_openai_key: str = field(default_factory=lambda: AZURE_OPENAI_KEY)
     azure_endpoint: str = field(default_factory=lambda: AZURE_ENDPOINT)
     azure_deployment: str = field(default_factory=lambda: AZURE_DEPLOYMENT)
@@ -267,10 +293,38 @@ class ScoreRagConfig:
         config = cls()
         
         # API配置
+        config.api_provider = normalize_provider(os.getenv("ENSAGENT_API_PROVIDER", config.api_provider))
+        config.api_key = os.getenv("ENSAGENT_API_KEY", config.api_key)
+        config.api_endpoint = os.getenv("ENSAGENT_API_ENDPOINT", config.api_endpoint)
+        config.api_version = os.getenv("ENSAGENT_API_VERSION", config.api_version)
+        config.api_model = os.getenv("ENSAGENT_API_MODEL", config.api_model)
+
         config.azure_openai_key = os.getenv("AZURE_OPENAI_KEY", config.azure_openai_key)
         config.azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", config.azure_endpoint)
         config.azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", config.azure_deployment)
         config.azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION", config.azure_api_version)
+
+        effective = resolve_provider_config(
+            api_provider=config.api_provider,
+            api_key=config.api_key,
+            api_endpoint=config.api_endpoint,
+            api_version=config.api_version,
+            api_model=config.api_model,
+            azure_openai_key=config.azure_openai_key,
+            azure_endpoint=config.azure_endpoint,
+            azure_api_version=config.azure_api_version,
+            azure_deployment=config.azure_deployment,
+        )
+        config.api_provider = effective.provider
+        config.api_key = effective.api_key
+        config.api_endpoint = effective.endpoint
+        config.api_version = effective.api_version
+        config.api_model = effective.model
+        if effective.provider == "azure":
+            config.azure_openai_key = effective.api_key
+            config.azure_endpoint = effective.endpoint
+            config.azure_api_version = effective.api_version
+            config.azure_deployment = effective.model
         
         # 评分配置
         config.top_n_deg = int(os.getenv("SCORE_RAG_TOP_N_DEG", config.top_n_deg))
@@ -360,14 +414,40 @@ class ScoreRagConfig:
     def validate(self) -> None:
         """验证配置有效性"""
         errors = []
-        
-        # API配置验证
-        if not self.azure_openai_key:
-            errors.append("azure_openai_key is required")
-        if not self.azure_endpoint:
-            errors.append("azure_endpoint is required")
-        if not self.azure_deployment:
-            errors.append("azure_deployment is required")
+
+        effective = resolve_provider_config(
+            api_provider=self.api_provider,
+            api_key=self.api_key,
+            api_endpoint=self.api_endpoint,
+            api_version=self.api_version,
+            api_model=self.api_model,
+            azure_openai_key=self.azure_openai_key,
+            azure_endpoint=self.azure_endpoint,
+            azure_api_version=self.azure_api_version,
+            azure_deployment=self.azure_deployment,
+        )
+        self.api_provider = effective.provider
+        self.api_key = effective.api_key
+        self.api_endpoint = effective.endpoint
+        self.api_version = effective.api_version
+        self.api_model = effective.model
+        if self.api_provider == "azure":
+            self.azure_openai_key = self.api_key
+            self.azure_endpoint = self.api_endpoint
+            self.azure_api_version = self.api_version
+            self.azure_deployment = self.api_model
+
+        if not self.api_key:
+            errors.append("api_key is required")
+        if not self.api_model:
+            errors.append("api_model is required")
+        if self.api_provider in {"openai_compatible", "others"} and not self.api_endpoint:
+            errors.append("api_endpoint is required for openai-compatible providers")
+        if self.api_provider == "azure":
+            if not self.api_endpoint:
+                errors.append("api_endpoint is required for azure provider")
+            if not self.api_version:
+                errors.append("api_version is required for azure provider")
         
         # 数值范围验证
         if self.temperature < 0 or self.temperature > 2:
@@ -479,6 +559,11 @@ def create_default_config_file(config_path: str = "score_rag_config.json") -> No
 # ---------------------------------------------------------------------------
 
 __all__ = [
+    "API_PROVIDER",
+    "API_KEY",
+    "API_ENDPOINT",
+    "API_MODEL",
+    "API_VERSION",
     # 传统常量（向后兼容）
     "AZURE_OPENAI_KEY",
     "AZURE_ENDPOINT", 

@@ -25,6 +25,7 @@ dependencies:
   - pip:
       # LLM & LangChain (scoring + annotation + chat agent)
       - openai==1.109.1
+      - litellm>=1.57.0
       - langchain
       - langchain-community
       - langchain-openai==0.1.0

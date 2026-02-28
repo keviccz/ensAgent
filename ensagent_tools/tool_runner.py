@@ -9,6 +9,7 @@ import sys
 from typing import Any, Dict, List, Optional
 
 from ensagent_tools.config_manager import PipelineConfig
+from ensagent_tools.env_manager import resolve_conda_executable
 
 
 def run_tool_runner(
@@ -37,6 +38,19 @@ def run_tool_runner(
     if not dp or not sid:
         return {"ok": False, "error": "data_path and sample_id are required"}
 
+    resolved_conda = resolve_conda_executable(cfg)
+    conda_exe = resolved_conda.get("exe")
+    if not resolved_conda.get("ok") or not conda_exe:
+        return {
+            "ok": False,
+            "error": (
+                "No usable conda/mamba executable found. "
+                "Checked config, MAMBA_EXE/CONDA_EXE, and PATH."
+            ),
+            "requested_conda_exe": resolved_conda.get("requested"),
+            "resolver_checked": resolved_conda.get("checked", []),
+        }
+
     cmd = [
         sys.executable, str(script),
         "--data_path", str(dp),
@@ -44,7 +58,7 @@ def run_tool_runner(
         "--output_dir", str(od),
         "--n_clusters", str(int(nc)),
         "--random_seed", str(int(rs)),
-        "--conda_exe", cfg.conda_exe,
+        "--conda_exe", str(conda_exe),
     ]
     for label in ("R", "PY", "PY2"):
         cmd += [f"--env_{label.lower()}", cfg.env_names.get(label, label)]
@@ -53,4 +67,13 @@ def run_tool_runner(
 
     print(f"[Tool] Running Tool-runner -> {od}")
     p = subprocess.run(cmd, cwd=str(repo), check=False)
-    return {"ok": p.returncode == 0, "exit_code": p.returncode, "output_dir": od}
+    return {
+        "ok": p.returncode == 0,
+        "exit_code": p.returncode,
+        "output_dir": od,
+        "conda_exe": str(conda_exe),
+        "conda_source": resolved_conda.get("source", ""),
+        "n_clusters_used": int(nc),
+        "random_seed_used": int(rs),
+        "methods_used": list(meths) if meths else [],
+    }

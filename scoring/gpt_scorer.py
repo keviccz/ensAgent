@@ -1,10 +1,13 @@
-from langchain_openai import AzureChatOpenAI
 from typing import List, Dict, Tuple
 import json
 import re
+from types import SimpleNamespace
 from tenacity import retry, wait_random_exponential, stop_after_attempt, retry_if_exception_type
-import openai
 import sys
+try:
+    from provider_runtime import resolve_provider_config, completion_text
+except Exception:
+    from scoring.provider_runtime import resolve_provider_config, completion_text  # type: ignore
 
 
 # ---------------- English Biological Prompt ----------------
@@ -384,113 +387,62 @@ class GPTDomainScorer:
     """
     Enhanced GPT Domain Scorer with biological specificity and discrimination
     """
-    def __init__(self, 
-                 openai_api_key: str = None, 
-                 azure_endpoint: str = None, 
-                 azure_deployment: str = None, 
-                 azure_api_version: str = None,
-                 temperature: float = 0.0,
-                 max_completion_tokens: int = None,
-                 top_p: float = 1.0,
-                 frequency_penalty: float = 0.0,
-                 presence_penalty: float = 0.0,
-                 enforce_discrimination: bool = False): 
+    def __init__(
+        self,
+        openai_api_key: str = None,
+        api_provider: str = "",
+        api_key: str = "",
+        api_endpoint: str = "",
+        api_model: str = "",
+        api_version: str = "",
+        azure_endpoint: str = None,
+        azure_deployment: str = None,
+        azure_api_version: str = None,
+        temperature: float = 0.0,
+        max_completion_tokens: int = None,
+        top_p: float = 1.0,
+        frequency_penalty: float = 0.0,
+        presence_penalty: float = 0.0,
+        enforce_discrimination: bool = False,
+    ):
         """
-        Initialize GPT Domain Scorer for Azure OpenAI
+        Initialize GPT Domain Scorer for multi-provider runtime.
         """
         self.enforce_discrimination = enforce_discrimination
-        if azure_endpoint and azure_deployment and azure_api_version:
-            llm_params = {
-                "azure_endpoint": azure_endpoint,
-                "azure_deployment": azure_deployment,
-                "api_key": openai_api_key,
-                "api_version": azure_api_version,
-                "temperature": temperature,
-                "top_p": top_p,
-                "frequency_penalty": frequency_penalty,
-                "presence_penalty": presence_penalty
-            }
-            
-            # Add max_completion_tokens if provided
-            if max_completion_tokens is not None:
-                llm_params["max_completion_tokens"] = max_completion_tokens
-            
-            # 参数兼容性处理：某些模型不支持特定参数值
-            try:
-                self.llm = AzureChatOpenAI(**llm_params)
-            except Exception as e:
-                error_message = str(e).lower()
-                print(f"[Warning] 检测到参数兼容性问题: {e}")
-                
-                # 针对不同模型的特定处理
-                model_name = azure_deployment.lower() if azure_deployment else ""
-                
-                if "o4-mini" in model_name or "o1-mini" in model_name:
-                    # o4-mini/o1-mini 模型的特殊处理
-                    print(f"[Info] 检测到 {azure_deployment} 模型，应用特定兼容性设置")
-                    if "temperature" in error_message and ("0.0" in error_message or "not support" in error_message):
-                        print(f"[Info] {azure_deployment} 不支持自定义temperature，使用默认值")
-                        llm_params.pop("temperature", None)
-                    if "max_completion_tokens" in error_message:
-                        print(f"[Info] {azure_deployment} 不支持max_completion_tokens，移除该参数")
-                        llm_params.pop("max_completion_tokens", None)
-                
-                elif "gpt-4.1-mini" in model_name:
-                    # gpt-4.1-mini 模型支持更多参数，但可能有特定限制
-                    print(f"[Info] 检测到 gpt-4.1-mini 模型，应用优化设置")
-                    if "temperature" in error_message and "0.0" in error_message:
-                        print(f"[Info] 调整temperature为接近0的最小值: 0.01")
-                        llm_params["temperature"] = 0.01  # 使用接近0的值
-                
-                else:
-                    # 通用模型处理
-                    if "temperature" in error_message and "0.0" in error_message:
-                        print(f"[Info] 模型不支持temperature=0.0，使用默认值1.0")
-                        llm_params["temperature"] = 1.0
-                
-                # 通用参数处理
-                if "max_completion_tokens" in error_message or "max_tokens" in error_message:
-                    if "unsupported parameter" in error_message:
-                        print(f"[Info] 模型不支持max_completion_tokens参数，移除该参数")
-                        llm_params.pop("max_completion_tokens", None)
-                
-                if "top_p" in error_message and "not support" in error_message:
-                    print(f"[Info] 模型不支持top_p参数，使用默认值")
-                    llm_params.pop("top_p", None)
-                
-                if "frequency_penalty" in error_message:
-                    print(f"[Info] 模型不支持frequency_penalty参数，使用默认值")
-                    llm_params.pop("frequency_penalty", None)
-                    
-                if "presence_penalty" in error_message:
-                    print(f"[Info] 模型不支持presence_penalty参数，使用默认值")
-                    llm_params.pop("presence_penalty", None)
-                
-                # 重新尝试初始化
-                try:
-                    self.llm = AzureChatOpenAI(**llm_params)
-                    print(f"[Success] 使用兼容参数成功初始化 {azure_deployment} 模型")
-                    
-                    # 保存实际使用的参数供调试
-                    used_params = {k: v for k, v in llm_params.items() if k not in ['api_key']}
-                    print(f"[Debug] 实际使用的模型参数: {used_params}")
-                    
-                except Exception as e2:
-                    print(f"[Error] 即使使用兼容参数也无法初始化模型: {e2}")
-                    print(f"[Debug] 最终尝试的参数: {list(llm_params.keys())}")
-                    raise e2
-        else:
-            raise ValueError('Only Azure OpenAI Chat API is currently supported.')
+        self._temperature = float(temperature)
+        self._top_p = float(top_p)
+        self._max_completion_tokens = int(max_completion_tokens) if max_completion_tokens is not None else 3000
+
+        self._provider_cfg = resolve_provider_config(
+            api_provider=api_provider,
+            api_key=api_key or openai_api_key,
+            api_endpoint=api_endpoint or azure_endpoint,
+            api_version=api_version or azure_api_version,
+            api_model=api_model or azure_deployment,
+            azure_openai_key=openai_api_key,
+            azure_endpoint=azure_endpoint,
+            azure_api_version=azure_api_version,
+            azure_deployment=azure_deployment,
+        )
+        self._model = self._provider_cfg.model
 
         # Retry configuration
         @retry(
             reraise=True,
             wait=wait_random_exponential(multiplier=1, max=60),
             stop=stop_after_attempt(6),
-            retry=retry_if_exception_type((openai.OpenAIError, Exception))
+            retry=retry_if_exception_type((Exception,))
         )
         def _safe_invoke(messages):
-            return self.llm.invoke(messages)
+            text = completion_text(
+                config=self._provider_cfg,
+                model=self._model,
+                messages=messages,
+                temperature=self._temperature,
+                top_p=self._top_p,
+                max_tokens=self._max_completion_tokens,
+            )
+            return SimpleNamespace(content=text)
 
         self._safe_invoke = _safe_invoke
 

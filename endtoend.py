@@ -17,10 +17,15 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
 from ensagent_tools.config_manager import PipelineConfig, load_config
 from ensagent_tools.pipeline import run_full_pipeline
+
+
+def _add_bool_pair(ap: argparse.ArgumentParser, name: str, help_text: str) -> None:
+    """Add symmetric CLI flags: --<name> and --no_<name>."""
+    ap.add_argument(f"--{name}", dest=name, action="store_true", default=None, help=help_text)
+    ap.add_argument(f"--no_{name}", dest=name, action="store_false")
 
 
 def _build_cli_overrides(args: argparse.Namespace) -> dict:
@@ -50,7 +55,26 @@ def _build_cli_overrides(args: argparse.Namespace) -> dict:
     return overrides
 
 
-def main() -> None:
+def _validate_required_fields(cfg: PipelineConfig) -> list[str]:
+    """Validate required fields based on enabled pipeline stages."""
+    run_tool = not cfg.skip_tool_runner
+    run_scoring = not cfg.skip_scoring
+    run_best = cfg.run_best
+    run_annotation = cfg.run_annotation_multiagent
+
+    needs_any_stage = run_tool or run_scoring or run_best or run_annotation
+    needs_sample_id = needs_any_stage
+    needs_data_path = run_tool
+
+    errors: list[str] = []
+    if needs_sample_id and not cfg.sample_id:
+        errors.append("sample_id is required for enabled stages")
+    if needs_data_path and not cfg.data_path:
+        errors.append("data_path is required when tool_runner is enabled")
+    return errors
+
+
+def _build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         description="EnsAgent end-to-end pipeline runner",
         epilog=(
@@ -66,15 +90,20 @@ def main() -> None:
     ap.add_argument("--n_clusters", type=int, default=None)
     ap.add_argument("--random_seed", type=int, default=None)
     ap.add_argument("--methods", nargs="+", default=None)
-    ap.add_argument("--skip_tool_runner", action="store_true", default=None)
-    ap.add_argument("--overwrite_staging", action="store_true", default=None)
-    ap.add_argument("--vlm_off", action="store_true", default=None, help="Disable visual-score integration in scoring")
-    ap.add_argument("--skip_scoring", action="store_true", default=None)
-    ap.add_argument("--run_best", action="store_true", default=None)
+    _add_bool_pair(ap, "skip_tool_runner", "Skip Tool-runner phase")
+    _add_bool_pair(ap, "overwrite_staging", "Overwrite staged files in scoring/input")
+    _add_bool_pair(ap, "vlm_off", "Disable visual-score integration in scoring")
+    _add_bool_pair(ap, "skip_scoring", "Skip scoring phase")
+    _add_bool_pair(ap, "run_best", "Run BEST builder phase")
     ap.add_argument("--best_output_dir", default=None)
-    ap.add_argument("--best_smooth_knn", action="store_true", default=None)
+    _add_bool_pair(ap, "best_smooth_knn", "Enable BEST kNN smoothing")
     ap.add_argument("--best_truth_file", default=None)
-    ap.add_argument("--run_annotation_multiagent", action="store_true", default=None)
+    _add_bool_pair(ap, "run_annotation_multiagent", "Run multi-agent annotation phase")
+    return ap
+
+
+def main() -> None:
+    ap = _build_parser()
 
     args = ap.parse_args()
 
@@ -83,10 +112,12 @@ def main() -> None:
 
     cfg = load_config(path=config_path, cli_overrides=cli_overrides)
 
-    if not cfg.data_path or not cfg.sample_id:
+    validation_errors = _validate_required_fields(cfg)
+    if validation_errors:
+        joined = "\n".join(f"  - {err}" for err in validation_errors)
         print(
-            "[Error] data_path and sample_id are required.\n"
-            "Set them in pipeline_config.yaml or pass via CLI.\n"
+            f"[Error] Missing required configuration:\n{joined}\n"
+            "Set required fields in pipeline_config.yaml or pass via CLI.\n"
             "  cp pipeline_config.example.yaml pipeline_config.yaml\n"
             "  # edit pipeline_config.yaml, then:\n"
             "  python endtoend.py"

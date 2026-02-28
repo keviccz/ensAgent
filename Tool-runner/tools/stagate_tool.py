@@ -14,7 +14,11 @@ import scanpy as sc
 import pandas as pd
 import torch
 from sklearn.decomposition import PCA
-import STAGATE
+try:
+    import STAGATE
+except ImportError:
+    # STAGATE_pyG installs as `STAGATE_pyG` in some releases.
+    import STAGATE_pyG as STAGATE
 
 
 def run_stagate(data_path, sample_id, output_dir, n_clusters=7, random_seed=2023):

@@ -11,13 +11,9 @@ import os
 def check_dependencies():
     """检查依赖包是否安装"""
     required_packages = [
-        'azure-ai-formrecognizer',
-        'azure-cognitiveservices-vision-computervision', 
-        'azure-identity',
-        'azure-storage-blob',
         'flask',
         'flask-cors',
-        'openai',
+        'litellm',
         'pillow',
         'python-dotenv',
         'requests',
@@ -46,24 +42,21 @@ def check_config():
     """检查配置文件"""
     from config import Config
 
-    if not Config.IS_AZURE_PROVIDER:
-        print("❌ 当前 api_provider 不是 azure，pic_analyze 无法运行。")
-        print("   请将 pipeline_config.yaml 的 api_provider 设为 azure，或在上游使用 --vlm_off。")
-        return False
-
     missing = []
-    if not Config.AZURE_OPENAI_ENDPOINT or "your-resource.openai.azure.com" in Config.AZURE_OPENAI_ENDPOINT:
-        missing.append("AZURE_OPENAI_ENDPOINT")
-    if not Config.AZURE_OPENAI_API_KEY or Config.AZURE_OPENAI_API_KEY == "your-api-key-here":
-        missing.append("AZURE_OPENAI_API_KEY")
-    if not Config.AZURE_OPENAI_DEPLOYMENT_NAME:
-        missing.append("AZURE_OPENAI_DEPLOYMENT_NAME")
+    if not Config.API_KEY or Config.API_KEY == "your-api-key-here":
+        missing.append("api_key")
+    if not Config.API_MODEL:
+        missing.append("api_model")
+    if Config.API_PROVIDER in {"openai_compatible", "others"} and not Config.API_ENDPOINT:
+        missing.append("api_endpoint")
 
     if missing:
         print("❌ 缺少必要配置（可来自环境变量/.env/pipeline_config.yaml）:")
         for var in missing:
             print(f"   - {var}")
         return False
+
+    print(f"✅ pic_analyze provider: {Config.API_PROVIDER or 'openai'}")
     
     return True
 

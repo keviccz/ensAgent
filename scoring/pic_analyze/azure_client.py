@@ -1,38 +1,86 @@
 import base64
+from types import SimpleNamespace
 from typing import Any, Dict, List
 
-from openai import AzureOpenAI
+try:
+    from .config import Config
+except Exception:  # pragma: no cover - script-mode fallback
+    from config import Config
 
-from config import Config
+try:
+    from provider_runtime import resolve_provider_config, completion_text
+except Exception:
+    from scoring.provider_runtime import resolve_provider_config, completion_text  # type: ignore
+
+
+class _CompletionAdapter:
+    def __init__(self, runtime: "AzureOpenAIClient"):
+        self._runtime = runtime
+
+    def create(self, *, model: str, messages: List[Dict[str, Any]], max_tokens: int = 1200, temperature: float = 0.2, **_kwargs):
+        return self._runtime._create_completion(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+
+
+class _ChatAdapter:
+    def __init__(self, runtime: "AzureOpenAIClient"):
+        self.completions = _CompletionAdapter(runtime)
+
+
+class _ClientAdapter:
+    def __init__(self, runtime: "AzureOpenAIClient"):
+        self.chat = _ChatAdapter(runtime)
 
 
 class AzureOpenAIClient:
-    """Azure OpenAI client for conversation + image analysis + OCR checks."""
+    """Backward-compatible name; now uses unified multi-provider runtime."""
 
     def __init__(self):
-        if not Config.IS_AZURE_PROVIDER:
-            raise ValueError(
-                "pic_analyze currently supports Azure OpenAI only. "
-                "Set api_provider=azure in pipeline_config.yaml, or use --vlm_off to disable visual module."
-            )
-        if not all(
-            [
-                Config.AZURE_OPENAI_ENDPOINT,
-                Config.AZURE_OPENAI_API_KEY,
-                Config.AZURE_OPENAI_DEPLOYMENT_NAME,
-            ]
-        ):
-            raise ValueError("Azure OpenAI configuration is incomplete.")
-
-        self.client = AzureOpenAI(
+        self._provider_cfg = resolve_provider_config(
+            api_provider=Config.API_PROVIDER,
+            api_key=Config.API_KEY,
+            api_endpoint=Config.API_ENDPOINT,
+            api_version=Config.API_VERSION,
+            api_model=Config.API_MODEL,
+            azure_openai_key=Config.AZURE_OPENAI_API_KEY,
             azure_endpoint=Config.AZURE_OPENAI_ENDPOINT,
-            api_key=Config.AZURE_OPENAI_API_KEY,
-            api_version=Config.AZURE_OPENAI_API_VERSION,
+            azure_api_version=Config.AZURE_OPENAI_API_VERSION,
+            azure_deployment=Config.AZURE_OPENAI_DEPLOYMENT_NAME,
         )
-        self.deployment_name = Config.AZURE_OPENAI_DEPLOYMENT_NAME
+        if not self._provider_cfg.api_key:
+            raise ValueError("Provider API key is missing for pic_analyze.")
+        if self._provider_cfg.provider in {"openai_compatible", "others"} and not self._provider_cfg.endpoint:
+            raise ValueError("Custom OpenAI-compatible provider requires api_endpoint.")
+
+        self.client = _ClientAdapter(self)
+        self.deployment_name = Config.API_MODEL
         self.ocr_deployment_name = Config.AZURE_OPENAI_OCR_DEPLOYMENT_NAME
         self._ocr_capability_checked = False
         self._ocr_cache: Dict[str, str] = {}
+
+    def _create_completion(
+        self,
+        *,
+        model: str,
+        messages: List[Dict[str, Any]],
+        max_tokens: int = 1200,
+        temperature: float = 0.2,
+    ) -> Any:
+        text = completion_text(
+            config=self._provider_cfg,
+            model=model or self.deployment_name,
+            messages=messages,
+            temperature=float(temperature),
+            top_p=1.0,
+            max_tokens=int(max_tokens),
+        )
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=text))]
+        )
 
     def encode_image(self, image_path: str) -> str:
         try:
@@ -80,7 +128,7 @@ class AzureOpenAIClient:
             if self._looks_like_ocr_capability_error(exc):
                 raise RuntimeError(
                     "Configured model does not support OCR/vision image input. "
-                    "Please set an OCR-capable Azure deployment, or disable visual module with --vlm_off."
+                    "Please set an OCR-capable model, or disable visual module with --vlm_off."
                 ) from exc
             raise
 
@@ -121,7 +169,7 @@ class AzureOpenAIClient:
             if self._looks_like_ocr_capability_error(exc):
                 raise RuntimeError(
                     "Configured model does not support OCR/vision image input. "
-                    "Please set an OCR-capable Azure deployment, or disable visual module with --vlm_off."
+                    "Please set an OCR-capable model, or disable visual module with --vlm_off."
                 ) from exc
             raise Exception(f"OCR extraction failed: {exc}")
 
@@ -177,3 +225,4 @@ class AzureOpenAIClient:
             return str(response.choices[0].message.content or "")
         except Exception as exc:
             raise Exception(f"Chat failed: {exc}")
+

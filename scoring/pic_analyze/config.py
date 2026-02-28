@@ -1,9 +1,33 @@
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Mapping
+try:
+    from provider_runtime import resolve_provider_config
+except Exception:
+    from scoring.provider_runtime import resolve_provider_config  # type: ignore
 
-from dotenv import load_dotenv
-import yaml
+try:
+    from dotenv import load_dotenv
+except Exception:  # pragma: no cover - optional dependency fallback
+    def load_dotenv(*_args, **_kwargs):
+        return False
+
+    warnings.warn(
+        "python-dotenv is not installed; .env autoload is disabled for pic_analyze.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+
+try:
+    import yaml
+except Exception:  # pragma: no cover - optional dependency fallback
+    yaml = None
+    warnings.warn(
+        "PyYAML is not installed; pipeline_config.yaml will not be read by pic_analyze.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
 
 # Load environment variables from local .env when present.
 load_dotenv()
@@ -14,6 +38,8 @@ def _repo_root() -> Path:
 
 
 def _load_pipeline_config(repo_root: Path | None = None) -> Dict[str, Any]:
+    if yaml is None:
+        return {}
     root = repo_root or _repo_root()
     cfg_path = root / "pipeline_config.yaml"
     if not cfg_path.exists():
@@ -62,43 +88,55 @@ def _resolve_azure_openai_settings(
     env_map = dict(os.environ) if env is None else dict(env)
     raw = _load_pipeline_config() if pipeline_raw is None else dict(pipeline_raw)
 
-    pipeline_endpoint = _first_non_empty(raw.get("api_endpoint", ""), raw.get("azure_endpoint", ""))
-    pipeline_provider = _normalize_provider(str(raw.get("api_provider") or ""))
-    detected_provider = _detect_provider_from_endpoint(pipeline_endpoint)
-    effective_provider = pipeline_provider or detected_provider
+    resolved = resolve_provider_config(
+        api_provider=str(raw.get("api_provider") or env_map.get("ENSAGENT_API_PROVIDER", "")),
+        api_key=_first_non_empty(
+            env_map.get("ENSAGENT_API_KEY", ""),
+            str(raw.get("api_key") or ""),
+        ),
+        api_endpoint=_first_non_empty(
+            env_map.get("ENSAGENT_API_ENDPOINT", ""),
+            str(raw.get("api_endpoint") or ""),
+        ),
+        api_version=_first_non_empty(
+            env_map.get("ENSAGENT_API_VERSION", ""),
+            str(raw.get("api_version") or ""),
+        ),
+        api_model=_first_non_empty(
+            env_map.get("ENSAGENT_API_MODEL", ""),
+            str(raw.get("api_model") or raw.get("api_deployment") or ""),
+        ),
+        azure_openai_key=_first_non_empty(
+            env_map.get("AZURE_OPENAI_API_KEY", ""),
+            env_map.get("AZURE_OPENAI_KEY", ""),
+            str(raw.get("azure_openai_key") or ""),
+        ),
+        azure_endpoint=_first_non_empty(
+            env_map.get("AZURE_OPENAI_ENDPOINT", ""),
+            env_map.get("AZURE_ENDPOINT", ""),
+            str(raw.get("azure_endpoint") or ""),
+        ),
+        azure_api_version=_first_non_empty(
+            env_map.get("AZURE_OPENAI_API_VERSION", ""),
+            env_map.get("AZURE_API_VERSION", ""),
+            str(raw.get("azure_api_version") or ""),
+        ),
+        azure_deployment=_first_non_empty(
+            env_map.get("AZURE_OPENAI_DEPLOYMENT_NAME", ""),
+            env_map.get("AZURE_OPENAI_DEPLOYMENT", ""),
+            env_map.get("AZURE_DEPLOYMENT", ""),
+            str(raw.get("azure_deployment") or ""),
+        ),
+        env=env_map,
+    )
+    effective_provider = resolved.provider
     is_azure = effective_provider == "azure"
-
-    endpoint = _first_non_empty(
-        env_map.get("AZURE_OPENAI_ENDPOINT", ""),
-        env_map.get("AZURE_ENDPOINT", ""),
-        raw.get("api_endpoint", "") if is_azure else "",
-        raw.get("azure_endpoint", ""),
-        "https://your-resource.openai.azure.com/",
-    )
-    api_key = _first_non_empty(
-        env_map.get("AZURE_OPENAI_API_KEY", ""),
-        env_map.get("AZURE_OPENAI_KEY", ""),
-        raw.get("api_key", "") if is_azure else "",
-        raw.get("azure_openai_key", ""),
-        "",
-    )
-    api_version = _first_non_empty(
-        env_map.get("AZURE_OPENAI_API_VERSION", ""),
-        env_map.get("AZURE_API_VERSION", ""),
-        raw.get("api_version", "") if is_azure else "",
-        raw.get("azure_api_version", ""),
-        "2024-12-01-preview",
-    )
-    deployment_name = _first_non_empty(
-        env_map.get("AZURE_OPENAI_DEPLOYMENT_NAME", ""),
-        env_map.get("AZURE_OPENAI_DEPLOYMENT", ""),
-        env_map.get("AZURE_DEPLOYMENT", ""),
-        raw.get("api_model", "") if is_azure else "",
-        raw.get("api_deployment", "") if is_azure else "",
-        raw.get("azure_deployment", ""),
-        "gpt-4.1-mini",
-    )
+    endpoint = resolved.endpoint
+    api_key = resolved.api_key
+    api_version = resolved.api_version
+    deployment_name = resolved.model
     ocr_deployment_name = _first_non_empty(
+        env_map.get("ENSAGENT_OCR_MODEL", ""),
         env_map.get("AZURE_OPENAI_OCR_DEPLOYMENT_NAME", ""),
         deployment_name,
     )
@@ -122,6 +160,10 @@ class Config:
 
     API_PROVIDER = _RESOLVED_API["provider"]
     IS_AZURE_PROVIDER = bool(_RESOLVED_API["is_azure_provider"])
+    API_ENDPOINT = _RESOLVED_API["endpoint"]
+    API_KEY = _RESOLVED_API["api_key"]
+    API_VERSION = _RESOLVED_API["api_version"]
+    API_MODEL = _RESOLVED_API["deployment_name"]
 
     # Azure OpenAI settings
     AZURE_OPENAI_ENDPOINT = _RESOLVED_API["endpoint"]

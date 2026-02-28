@@ -48,6 +48,8 @@ class PipelineConfig:
     # Scoring
     overwrite_staging: bool = False
     vlm_off: bool = False
+    temperature: float = 0.7
+    top_p: float = 1.0
 
     # BEST builder
     best_smooth_knn: bool = False

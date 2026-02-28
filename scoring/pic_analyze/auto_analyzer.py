@@ -5,18 +5,46 @@ import os
 import json
 import re
 import sys
+import warnings
 from datetime import datetime
 import time
 from typing import List, Dict, Any
-from azure_client import AzureOpenAIClient
-from image_manager import ImageManager
+
+try:
+    from .azure_client import AzureOpenAIClient
+except Exception:  # pragma: no cover - script-mode fallback
+    from azure_client import AzureOpenAIClient
+
+
+def _load_image_manager_class():
+    try:
+        from .image_manager import ImageManager
+    except Exception:
+        try:
+            from image_manager import ImageManager
+        except Exception as exc:
+            raise RuntimeError(
+                "pic_analyze ImageManager is unavailable. Install optional image dependencies."
+            ) from exc
+    return ImageManager
 
 class AutoClusteringAnalyzer:
     """自动聚类分析器，对domain1-7进行批量分析"""
     
     def __init__(self):
         """初始化自动聚类分析器"""
-        self.azure_client = AzureOpenAIClient()
+        self.azure_client = None
+        self._azure_client_error = None
+        try:
+            self.azure_client = AzureOpenAIClient()
+        except Exception as exc:
+            self._azure_client_error = exc
+            warnings.warn(
+                f"AzureOpenAIClient unavailable in pic_analyze: {exc}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        ImageManager = _load_image_manager_class()
         self.image_manager = ImageManager()
         self.output_dir = "output"
         
@@ -468,10 +496,28 @@ Please ensure analysis is objective and professional, conduct scientific assessm
             "does not support" in msg
             and ("ocr" in msg or "vision" in msg or "image input" in msg)
         )
+
+    @staticmethod
+    def _is_dependency_error(exc: Exception) -> bool:
+        msg = str(exc).lower()
+        return (
+            "azure client is unavailable" in msg
+            or "openai package is required" in msg
+            or "install optional dependencies" in msg
+        )
+
+    def _ensure_azure_client_ready(self) -> None:
+        if self.azure_client is None:
+            raise RuntimeError(
+                "pic_analyze Azure client is unavailable. Install optional dependencies "
+                "(e.g., openai/python-dotenv) or disable visual module with --vlm_off."
+            ) from self._azure_client_error
     
     def analyze_domain(self, domain_num: int) -> Dict[str, Any]:
         """Analyze clustering effectiveness of specified domain"""
         try:
+            self._ensure_azure_client_ready()
+
             # 获取所有图片
             images = self.image_manager.list_images()
             if len(images) < 2:
@@ -777,6 +823,10 @@ Please ensure analysis is objective and professional, conduct scientific assessm
                         result = self.analyze_domain(domain_num)
                         break
                     except Exception as e:
+                        if self._is_dependency_error(e):
+                            print(f"⚠️ Domain{domain_num} 缺少视觉模块依赖：{e}")
+                            print("⚠️ 无法继续 pic_analyze，建议安装依赖或在上游使用 --vlm_off。")
+                            return False
                         if self._is_ocr_capability_error(e):
                             print(f"⚠️ Domain{domain_num} 检测到模型不支持 OCR/视觉输入：{e}")
                             print("⚠️ 已自动降级为无视觉模块模式（仅本次运行），请继续在上游使用 --vlm_off。")

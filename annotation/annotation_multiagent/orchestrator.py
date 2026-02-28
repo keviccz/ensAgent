@@ -10,7 +10,7 @@ from scoring.config import ScoreRagConfig, load_config
 
 from .critic import critic_agent
 from .experts import marker_celltype_agent, pathway_agent, spatial_anatomy_agent, vlm_agent
-from .llm_clients import make_azure_openai_client, chat_json
+from .llm_clients import make_provider_client, chat_json
 from .logger import run_dir, write_json, utc_now_iso
 from .proposer import compute_peer_scores, propose_annotation
 from .schemas import (
@@ -1452,9 +1452,19 @@ def run_annotation_multiagent(
     all_domains = sorted(set(int(x) for x in spots_df["spatial_domain"].unique()))
     domains = [d for d in all_domains if (not target_domains or d in target_domains)]
 
-    # Azure client (text+vision if supported by the deployment)
-    client = make_azure_openai_client(cfg.azure_endpoint, cfg.azure_openai_key, cfg.azure_api_version)
-    model = cfg.azure_deployment
+    # Provider client (text+vision depending on selected provider/model capability)
+    client = make_provider_client(
+        api_provider=getattr(cfg, "api_provider", ""),
+        api_key=getattr(cfg, "api_key", ""),
+        api_endpoint=getattr(cfg, "api_endpoint", ""),
+        api_version=getattr(cfg, "api_version", ""),
+        api_model=getattr(cfg, "api_model", ""),
+        azure_openai_key=getattr(cfg, "azure_openai_key", ""),
+        azure_endpoint=getattr(cfg, "azure_endpoint", ""),
+        azure_api_version=getattr(cfg, "azure_api_version", ""),
+        azure_deployment=getattr(cfg, "azure_deployment", ""),
+    )
+    model = str(getattr(cfg, "api_model", "") or getattr(cfg, "azure_deployment", ""))
 
     # Run folder for this sample
     rd = run_dir(settings.log_dir, sample_id)
@@ -1843,5 +1853,4 @@ def run_annotation_multiagent(
         json.dump(merged, f, indent=2, ensure_ascii=False)
 
     return final_results
-
 

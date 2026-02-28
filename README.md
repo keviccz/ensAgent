@@ -7,25 +7,25 @@ Integrates eight clustering methods, LLM-based evaluation, consensus label selec
 
 ## Pipeline Overview
 
-| Stage | Module | Description |
-|-------|--------|-------------|
-| **A** Tool-Runner | `Tool-runner/orchestrator.py` | Execute 8 spatial clustering methods, align labels, generate downstream outputs |
-| **B** Scoring | `scoring/scoring.py` | LLM-driven evaluation of each method per domain, build consensus matrices |
-| **C** BEST Builder | `ensemble/build_best.py` | Select optimal domain labels from scores/labels matrices, produce `BEST_*` files |
-| **D** Annotation | `annotation/annotation_multiagent/` | Multi-agent (VLM + Peer + Critic) annotation of spatial domains |
+| Stage              | Module                              | Description                                                                      |
+| ------------------ | ----------------------------------- | -------------------------------------------------------------------------------- |
+| **A** Tool-Runner  | `Tool-runner/orchestrator.py`       | Execute 8 spatial clustering methods, align labels, generate downstream outputs  |
+| **B** Scoring      | `scoring/scoring.py`                | LLM-driven evaluation of each method per domain, build consensus matrices        |
+| **C** BEST Builder | `ensemble/build_best.py`            | Select optimal domain labels from scores/labels matrices, produce `BEST_*` files |
+| **D** Annotation   | `annotation/annotation_multiagent/` | Multi-agent (VLM + Peer + Critic) annotation of spatial domains                  |
 
 ## Supported Clustering Methods
 
-| Method | Env | Reference |
-|--------|-----|-----------|
-| IRIS | R | [Nat Commun 2024](https://doi.org/10.1038/s41467-024-46638-4) |
-| BASS | R | [Nat Biotechnol 2022](https://doi.org/10.1038/s41587-022-01536-2) |
-| DR-SC | R | [Nat Commun 2023](https://doi.org/10.1038/s41467-023-35947-w) |
-| BayesSpace | R | [Nat Biotechnol 2021](https://doi.org/10.1038/s41587-021-00935-2) |
-| SEDR | PY | [Nat Commun 2022](https://doi.org/10.1038/s41467-022-29439-6) |
-| GraphST | PY | [Nat Commun 2023](https://doi.org/10.1038/s41467-023-36796-3) |
-| STAGATE | PY | [Nat Commun 2022](https://doi.org/10.1038/s41467-022-29439-6) |
-| stLearn | PY2 | [bioRxiv 2020](https://doi.org/10.1101/2020.05.31.125658) |
+| Method     | Env | Reference                                                         |
+| ---------- | --- | ----------------------------------------------------------------- |
+| IRIS       | R   | [Nat Commun 2024](https://doi.org/10.1038/s41467-024-46638-4)     |
+| BASS       | R   | [Nat Biotechnol 2022](https://doi.org/10.1038/s41587-022-01536-2) |
+| DR-SC      | R   | [Nat Commun 2023](https://doi.org/10.1038/s41467-023-35947-w)     |
+| BayesSpace | R   | [Nat Biotechnol 2021](https://doi.org/10.1038/s41587-021-00935-2) |
+| SEDR       | PY  | [Nat Commun 2022](https://doi.org/10.1038/s41467-022-29439-6)     |
+| GraphST    | PY  | [Nat Commun 2023](https://doi.org/10.1038/s41467-023-36796-3)     |
+| STAGATE    | PY  | [Nat Commun 2022](https://doi.org/10.1038/s41467-022-29439-6)     |
+| stLearn    | PY2 | [bioRxiv 2020](https://doi.org/10.1101/2020.05.31.125658)         |
 
 ## Quick Start
 
@@ -47,8 +47,6 @@ mamba env create -f envs/PY_environment.yml   # PY: SEDR, GraphST, STAGATE
 mamba env create -f envs/PY2_environment.yml  # PY2: stLearn
 ```
 
-> If `environment.yml` is slow to solve, try `environment.fast.yml` instead.
-
 ### 3. Configure
 
 ```bash
@@ -67,12 +65,26 @@ best_truth_file: "Tool-runner/151507/151507_truth.txt"
 
 `streamlit_app` Settings writes API values and data/sample defaults to `pipeline_config.yaml`.
 On first load, Settings auto-detects `data_path` and `sample_id` in this order:
+
 1. `pipeline_config.yaml`
 2. `Tool-runner/configs/*.yaml`
 3. repo scan for Visium markers (`filtered_feature_bc_matrix.h5` + `spatial/`)
-`api_config.py` is deprecated and kept only for backward-compatible fallback.
+   `api_config.py` is deprecated and kept only for backward-compatible fallback.
+   Settings also persists runtime parameters (`temperature`, `top_p`, `n_clusters`) to `pipeline_config.yaml`.
+   Float values are normalized on write to avoid representation noise (for example `1.0` instead of `0.9999999999999999`).
 
-Set Azure OpenAI credentials via environment variables:
+Set provider credentials via environment variables (recommended):
+
+```bash
+# Generic multi-provider path (preferred)
+export ENSAGENT_API_PROVIDER="openai"   # azure/openai/anthropic/openrouter/...
+export ENSAGENT_API_KEY="sk-..."
+export ENSAGENT_API_MODEL="gpt-4o"
+export ENSAGENT_API_ENDPOINT=""         # required for custom/openai-compatible endpoints
+export ENSAGENT_API_VERSION=""          # typically required for Azure
+```
+
+Azure compatibility aliases are still supported:
 
 ```bash
 export AZURE_OPENAI_KEY="sk-..."
@@ -116,6 +128,8 @@ EnsAgent/
 │   └── configs/                       # Orchestrator config presets used by `--config`
 │
 ├── scoring/                           # LLM scoring + matrix builder
+│   ├── scoring.py                     #   Stage B entrypoint
+│   └── provider_runtime.py            #   Unified multi-provider runtime (LiteLLM)
 ├── ensemble/                          # BEST builder (build_best.py)
 ├── annotation/                        # Multi-agent annotation
 ├── envs/                              # R / PY / PY2 environment YAMLs
@@ -138,6 +152,13 @@ python Tool-runner/orchestrator.py --config Tool-runner/configs/DLPFC_151507.yam
 # Stage B only: Scoring (reads from scoring/input/)
 cd scoring && python scoring.py
 
+# Stage B with explicit provider overrides (multi-provider)
+cd scoring && python scoring.py \
+  --api_provider openrouter \
+  --api_key "$OPENROUTER_API_KEY" \
+  --api_endpoint "https://openrouter.ai/api/v1" \
+  --api_model "openai/gpt-4o-mini"
+
 # Stage B with visual module disabled
 cd scoring && python scoring.py --vlm_off
 
@@ -154,7 +175,10 @@ python ensemble/build_best.py \
 python scoring/scoring.py \
   --annotation_multiagent \
   --annotation_data_dir output/best/DLPFC_151507 \
-  --annotation_sample_id DLPFC_151507
+  --annotation_sample_id DLPFC_151507 \
+  --api_provider openai \
+  --api_key "$OPENAI_API_KEY" \
+  --api_model gpt-4o
 ```
 
 ## Streamlit UI
@@ -165,14 +189,18 @@ streamlit run streamlit_app/main.py
 ```
 
 Features:
+
 - **Chat** -- converse with EnsAgent to run pipeline stages, check config, manage environments
+- **Background replies** -- Chat requests are processed in the background; after sending a message, you can switch pages and the reply will be written back to the originating conversation
 - **Conversation history** -- sidebar shows recent chats, auto-saved to `chat_history/` (legacy `.chat_history/` is auto-migrated)
-- **Export** -- use the `...` menu on each history item to export JSON or delete the conversation
+- **Export** -- use the right-side chevron menu on each history item to export JSON or delete the conversation
 - **Spatial Analysis** -- visualize clustering results
 - **Agent Orchestrator** -- monitor sub-agent status
 - **Settings** -- configure API credentials and pipeline parameters
   - API credentials are persisted in `pipeline_config.yaml` (git-ignored)
   - Data Path / Sample ID are auto-detected on page load when empty
+  - Chat / Scoring / Annotation / pic_analyze follow the selected provider
+  - If the selected model lacks vision/OCR support, visual modules auto-degrade to keep the pipeline runnable
 
 ## CLI Chat Agent
 
@@ -195,6 +223,8 @@ result = execute_tool("run_tool_runner", {"data_path": "...", "sample_id": "..."
 ```
 
 Available tools: `check_envs`, `setup_envs`, `run_tool_runner`, `run_scoring`, `run_best_builder`, `run_annotation`, `run_end_to_end`, `show_config`, `set_config`.
+`run_tool_runner` returns effective runtime fields (`n_clusters_used`, `random_seed_used`, `methods_used`).
+`run_scoring` returns effective runtime fields (`temperature_used`, `top_p_used`, `vlm_off_used`).
 
 Each tool also has an OpenAI function-calling JSON schema accessible via `ensagent_tools.TOOL_SCHEMAS`.
 
@@ -246,19 +276,23 @@ See `pipeline_config.example.yaml` for all available options with comments.
 
 Key parameters:
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `data_path` | (required) | Path to Visium data directory |
-| `sample_id` | (required) | Sample identifier |
-| `api_provider` | `""` | UI-selected provider in Streamlit Settings |
-| `api_endpoint` | `""` | API base endpoint |
-| `api_model` | `""` | Canonical model/deployment name across providers |
-| `api_deployment` | `""` | Model/deployment name |
-| `n_clusters` | 7 | Number of spatial domains |
-| `methods` | all 8 | Which clustering methods to run |
-| `conda_exe` | `mamba` | Package manager executable |
-| `run_best` | `true` | Run BEST builder after scoring |
-| `run_annotation_multiagent` | `true` | Run multi-agent annotation |
+| Parameter                   | Default    | Description                                      |
+| --------------------------- | ---------- | ------------------------------------------------ |
+| `data_path`                 | (required) | Path to Visium data directory                    |
+| `sample_id`                 | (required) | Sample identifier                                |
+| `api_provider`              | `""`       | UI-selected provider in Streamlit Settings       |
+| `api_key`                   | `""`       | API key for selected provider                    |
+| `api_endpoint`              | `""`       | API base endpoint                                |
+| `api_version`               | `""`       | API version (commonly used by Azure)             |
+| `api_model`                 | `""`       | Canonical model/deployment name across providers |
+| `api_deployment`            | `""`       | Legacy model/deployment alias                    |
+| `n_clusters`                | 7          | Number of spatial domains                        |
+| `methods`                   | all 8      | Which clustering methods to run                  |
+| `conda_exe`                 | `mamba`    | Package manager executable                       |
+| `run_best`                  | `true`     | Run BEST builder after scoring                   |
+| `run_annotation_multiagent` | `true`     | Run multi-agent annotation                       |
+
+Legacy Azure aliases (`azure_openai_key`, `azure_endpoint`, `azure_deployment`, `azure_api_version`) remain supported for backward compatibility.
 
 ## Troubleshooting
 
@@ -268,7 +302,11 @@ Key parameters:
 
 **Memory errors**: Reduce the number of methods or increase system RAM.
 
-**API authentication errors**: Verify `AZURE_OPENAI_KEY` and `AZURE_OPENAI_ENDPOINT` env vars are set correctly.
+**API authentication errors**: Verify provider config is complete (`api_provider`, `api_key`, `api_model`; plus `api_endpoint` for custom/openai-compatible providers).
+
+**Vision/OCR capability errors**: Use a vision-capable model or run with `--vlm_off` to disable visual integration while keeping text-based scoring/annotation running.
+
+**`No usable conda/mamba executable found`**: Ensure `mamba`/`conda` is available in PATH, or set `conda_exe` in `pipeline_config.yaml` (or `MAMBA_EXE`/`CONDA_EXE`).
 
 ## System Requirements
 

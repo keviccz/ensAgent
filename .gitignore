@@ -58,6 +58,14 @@ scoring/pic_analyze/output/
 .worktrees/
 worktrees/
 Tool-runner/.git_toolrunner_backup/
+.conda_pkgs/
+.npm_cache/
+.pw-browsers/
+.tmp/
+orchestrator_test_*/
+.venv/
+.mypy_cache/
+.ruff_cache/
 
 # Temporary files and scripts
 /temp_*

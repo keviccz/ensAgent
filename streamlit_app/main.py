@@ -33,7 +33,7 @@ from streamlit_app.utils.state import init_session_state, get_state
 from streamlit_app.components.sidebar import render_sidebar
 from streamlit_app.components.dashboard import render_spatial_analysis
 from streamlit_app.components.agents import render_agent_orchestrator
-from streamlit_app.components.chat import render_chat_interface
+from streamlit_app.components.chat import render_chat_interface, process_pending_response
 from streamlit_app.components.settings import render_settings
 
 
@@ -48,6 +48,7 @@ PAGE_TITLES = {
 def main():
     """Main application entry point."""
     init_session_state()
+    process_pending_response()
     st.markdown(get_premium_css(), unsafe_allow_html=True)
     render_sidebar()
     render_main_content()
@@ -57,7 +58,7 @@ def render_main_content():
     """Render the main content area with page routing."""
     active_page = get_state("active_page", "chat")
 
-    if active_page != "chat":
+    if active_page not in {"chat", "settings"}:
         title, subtitle = PAGE_TITLES.get(active_page, PAGE_TITLES["chat"])
         st.markdown(
             f"""

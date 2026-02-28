@@ -58,6 +58,31 @@ class ConfigBridgeTests(unittest.TestCase):
             loaded = load_pipeline_fields(repo_root=repo)
             self.assertEqual(loaded["n_clusters"], 11)
 
+    def test_sampling_parameters_are_saved_as_floats(self) -> None:
+        from streamlit_app.utils.config_bridge import load_pipeline_fields, save_pipeline_fields
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            save_pipeline_fields(repo_root=repo, temperature="0.35", top_p="0.82")
+
+            raw = yaml.safe_load((repo / "pipeline_config.yaml").read_text(encoding="utf-8")) or {}
+            self.assertEqual(raw.get("temperature"), 0.35)
+            self.assertEqual(raw.get("top_p"), 0.82)
+
+            loaded = load_pipeline_fields(repo_root=repo)
+            self.assertEqual(loaded["temperature"], 0.35)
+            self.assertEqual(loaded["top_p"], 0.82)
+
+    def test_sampling_parameters_are_normalized_without_float_noise(self) -> None:
+        from streamlit_app.utils.config_bridge import save_pipeline_fields
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            save_pipeline_fields(repo_root=repo, temperature=0.9999999999999999)
+
+            raw = yaml.safe_load((repo / "pipeline_config.yaml").read_text(encoding="utf-8")) or {}
+            self.assertEqual(raw.get("temperature"), 1.0)
+
     def test_load_uses_azure_fallback_keys(self) -> None:
         from streamlit_app.utils.config_bridge import load_pipeline_fields
 

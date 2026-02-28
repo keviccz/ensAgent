@@ -4,8 +4,6 @@ import base64
 import os
 from typing import Any, Dict, List, Optional
 
-from openai import AzureOpenAI
-
 from .llm_clients import chat_json
 from .schemas import ExpertOutput
 
@@ -18,7 +16,7 @@ def _encode_image_to_data_url(image_path: str) -> str:
 
 
 def marker_celltype_agent(
-    client: AzureOpenAI,
+    client: Any,
     model: str,
     *,
     domain_id: int,
@@ -89,7 +87,7 @@ Return JSON with fields:
 
 
 def pathway_agent(
-    client: AzureOpenAI,
+    client: Any,
     model: str,
     *,
     domain_id: int,
@@ -165,7 +163,7 @@ Return JSON with fields:
 
 
 def spatial_anatomy_agent(
-    client: AzureOpenAI,
+    client: Any,
     model: str,
     *,
     domain_id: int,
@@ -228,7 +226,7 @@ Guidance:
 
 
 def vlm_agent(
-    client: AzureOpenAI,
+    client: Any,
     model: str,
     *,
     domain_id: int,
@@ -324,5 +322,4 @@ Return JSON with fields:
             "evidence": [{"id": "V_ERR", "type": "vlm_required_failed", "items": [type(e).__name__], "strength": 1.0}],
             "quality_flags": ["vlm_parse_failed", "vlm_required_failed"],
         }
-
 

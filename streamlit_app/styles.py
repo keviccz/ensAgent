@@ -205,9 +205,9 @@ def get_premium_css() -> str:
             color: var(--text-secondary) !important;
             border: none !important;
             border-radius: var(--radius-sm) !important;
-            padding: 0.6rem 0.85rem !important;
+            padding: 0.52rem 0.74rem !important;
             font-weight: 500 !important;
-            font-size: 0.92rem !important;
+            font-size: 0.78rem !important;
             text-align: left !important;
             box-shadow: none !important;
             transition: background 0.15s ease, color 0.15s ease !important;
@@ -305,7 +305,7 @@ def get_premium_css() -> str:
         }}
 
         .ens-sidebar-subtitle {{
-            font-size: 0.8rem;
+            font-size: 0.68rem;
             color: var(--text-secondary);
             margin: 0;
             letter-spacing: 0.02em;
@@ -408,7 +408,7 @@ def get_premium_css() -> str:
 
         div[data-testid="stVerticalBlock"]:has(.ens-chip-actions-anchor) {{
             max-width: 1080px;
-            margin: -0.2rem auto 1rem auto;
+            margin: 0.35rem auto 0.85rem auto;
             padding: 0.35rem 0.45rem 0.65rem;
             background: transparent;
             border: none;
@@ -419,11 +419,11 @@ def get_premium_css() -> str:
         div[data-testid="stVerticalBlock"]:has(.ens-chip-actions-anchor) .stButton > button {{
             background: var(--bg-primary) !important;
             color: var(--text-secondary) !important;
-            border: 1px solid var(--border) !important;
+            border: 2px solid var(--border) !important;
             border-radius: 999px !important;
             padding: 0.375rem 0.875rem !important;
             font-size: 0.8125rem !important;
-            font-weight: 500 !important;
+            font-weight: 600 !important;
             box-shadow: none !important;
         }}
 
@@ -745,7 +745,14 @@ def get_premium_css() -> str:
         }}
 
         .blinking-cursor {{
-            animation: blink 1s step-end infinite;
+            display: none !important;
+        }}
+
+        .ens-streaming-indicator {{
+            color: var(--text-tertiary);
+            font-size: 0.75rem;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
         }}
 
         .ens-chat-surface {{
@@ -1355,12 +1362,12 @@ def get_premium_css() -> str:
             text-transform: uppercase;
             letter-spacing: 0.06em;
             color: var(--text-tertiary);
-            padding: 0.5rem 0.25rem 0.3rem;
+            padding: 0.46rem 0.15rem 0.24rem;
         }}
 
         .ens-history-empty {{
             font-family: {FONTS["primary"]};
-            font-size: 0.72rem;
+            font-size: 0.60rem;
             color: var(--text-tertiary);
             text-align: center;
             padding: 1rem 0;
@@ -1375,22 +1382,147 @@ def get_premium_css() -> str:
 
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-new-chat-anchor) .stButton > button {{
             color: #000000 !important;
-            font-size: 0.9rem !important;
+            font-size: 0.66rem !important;
             font-weight: 500 !important;
+            min-height: 1.5rem !important;
+            padding: 0.2rem 0.44rem !important;
         }}
 
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) .stButton > button {{
-            font-size: 0.62rem !important;
-            padding: 0.4rem 0.55rem !important;
-            min-height: 1.9rem !important;
+            font-size: 0.44rem !important;
+            padding: 0.18rem 0.34rem !important;
+            min-height: 1.42rem !important;
+            line-height: 1.15 !important;
         }}
 
-        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] > button {{
-            min-height: 1.9rem !important;
-            padding: 0.4rem 0.3rem !important;
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] {{
+            border: 0 !important;
+            outline: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] > button,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] > div > button,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-baseweb="popover"] > button,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"] {{
+            min-height: 1.2rem !important;
+            min-width: 0.9rem !important;
+            padding: 0.1rem 0.05rem !important;
             justify-content: center !important;
-            font-size: 0.85rem !important;
+            font-size: 0 !important;
+            font-weight: 600 !important;
+            line-height: 1 !important;
+            color: #111111 !important;
+            border: 0 !important;
+            border-width: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            outline: none !important;
+            outline-width: 0 !important;
+            outline-offset: 0 !important;
+            border-color: transparent !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] > button::before,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] > button::after,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"]::before,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"]::after {{
+            border: 0 !important;
+            outline: 0 !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            content: none !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] button,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-baseweb="popover"] > button,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-baseweb="popover"] > button[aria-expanded="true"],
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"],
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"][aria-expanded="true"] {{
+            border: none !important;
+            border-width: 0 !important;
+            border-color: transparent !important;
+            outline: none !important;
+            outline-width: 0 !important;
+            box-shadow: none !important;
+            background: transparent !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] button:hover,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] button:focus,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] button:focus-visible,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] button:active,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-baseweb="popover"] > button:hover,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-baseweb="popover"] > button:focus,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-baseweb="popover"] > button:focus-visible,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-baseweb="popover"] > button:active,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"]:hover,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"]:focus,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"]:focus-visible,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"]:active {{
+            background: transparent !important;
+            border: none !important;
+            border-width: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+            outline-width: 0 !important;
+            color: #111111 !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] button svg,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-baseweb="popover"] > button svg,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"] svg {{
+            color: #111111 !important;
+            fill: #111111 !important;
+            stroke: #111111 !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopoverPopover"] .stButton > button,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopoverPopover"] .stDownloadButton > button {{
+            font-size: 0.52rem !important;
+            min-height: 1.42rem !important;
+            padding: 0.16rem 0.3rem !important;
             color: var(--text-secondary) !important;
+            background: var(--surface) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 12px !important;
+            box-shadow: none !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopoverPopover"] .stButton > button:hover,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopoverPopover"] .stButton > button:focus,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopoverPopover"] .stDownloadButton > button:hover,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopoverPopover"] .stDownloadButton > button:focus {{
+            color: var(--text-primary) !important;
+            background: var(--bg-primary) !important;
+            border: 1px solid var(--border) !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }}
+
+        .ens-chat-empty-anchor {{
+            display: none;
+        }}
+
+        div[data-testid="stVerticalBlock"]:has(.ens-chat-empty-anchor) {{
+            margin-top: 0 !important;
+            min-height: calc(100svh - 210px);
+            padding-top: clamp(1rem, 4svh, 2.6rem);
+        }}
+
+        @media (max-width: 768px) {{
+            div[data-testid="stVerticalBlock"]:has(.ens-chip-actions-anchor) {{
+                margin-top: 0.2rem;
+            }}
+
+            div[data-testid="stVerticalBlock"]:has(.ens-chat-empty-anchor) {{
+                min-height: calc(100svh - 184px);
+                padding-top: clamp(0.75rem, 2.6svh, 1.8rem);
+            }}
         }}
 
         /* ===== Responsive ===== */
