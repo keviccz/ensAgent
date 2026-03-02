@@ -44,12 +44,14 @@ class PipelineConfig:
     # Path overrides (empty → auto-derived)
     tool_output_dir: str = ""
     best_output_dir: str = ""
+    csv_path: str = ""
 
     # Scoring
     overwrite_staging: bool = False
     vlm_off: bool = False
     temperature: float = 0.7
     top_p: float = 1.0
+    top_degs: int = 5
 
     # BEST builder
     best_smooth_knn: bool = False
@@ -89,6 +91,11 @@ class PipelineConfig:
         if self.best_output_dir:
             return Path(self.best_output_dir)
         return _REPO_ROOT / "output" / "best" / self.sample_id
+
+    def resolved_scoring_input_dir(self) -> Path:
+        if self.csv_path:
+            return Path(self.csv_path)
+        return _REPO_ROOT / "scoring" / "input"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

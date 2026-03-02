@@ -103,6 +103,7 @@ def init_session_state() -> None:
         # Data state
         "uploaded_files": {},
         "data_path": None,
+        "csv_path": None,
         "sample_id": None,
         "output_dir": None,
         
@@ -134,10 +135,16 @@ def init_session_state() -> None:
         "active_page": "chat",
         "active_tab": "Overview",
         "pending_prompt": None,
+        "pending_action": None,
+        "_quick_actions_hidden_conversations": [],
         "pending_user_input": None,
         "pending_request_conversation_id": None,
+        "pending_request_id": None,
         "pending_response_inflight": False,
         "pending_response_job_id": None,
+        "pending_live_log_lines": [],
+        "_chat_completion_tick": 0,
+        "_chat_completion_seen_tick": 0,
     }
     
     for key, value in defaults.items():
@@ -334,6 +341,8 @@ def add_pipeline_log(message: str, level: str = "info") -> None:
         "level": level,
         "message": message,
     })
+    if len(st.session_state.pipeline_logs) > 400:
+        st.session_state.pipeline_logs = st.session_state.pipeline_logs[-400:]
 
 
 def clear_pipeline_logs() -> None:

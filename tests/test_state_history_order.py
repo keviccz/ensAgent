@@ -186,12 +186,24 @@ class StateHistoryOrderTests(unittest.TestCase):
             state_mod.init_session_state()
 
         self.assertIn("pending_user_input", session)
+        self.assertIn("pending_action", session)
         self.assertIn("pending_request_conversation_id", session)
+        self.assertIn("pending_request_id", session)
         self.assertIn("pending_response_inflight", session)
         self.assertIn("pending_response_job_id", session)
+        self.assertIn("pending_live_log_lines", session)
+        self.assertIn("_quick_actions_hidden_conversations", session)
+        self.assertIn("_chat_completion_tick", session)
+        self.assertIn("_chat_completion_seen_tick", session)
         self.assertIsNone(session["pending_user_input"])
+        self.assertIsNone(session["pending_action"])
+        self.assertIsNone(session["pending_request_id"])
         self.assertFalse(session["pending_response_inflight"])
         self.assertIsNone(session["pending_response_job_id"])
+        self.assertEqual(session["pending_live_log_lines"], [])
+        self.assertEqual(session["_quick_actions_hidden_conversations"], [])
+        self.assertEqual(session["_chat_completion_tick"], 0)
+        self.assertEqual(session["_chat_completion_seen_tick"], 0)
 
 
 if __name__ == "__main__":

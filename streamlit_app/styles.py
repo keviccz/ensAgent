@@ -32,7 +32,6 @@ FONTS = {
     "mono": "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
 }
 
-
 def get_premium_css() -> str:
     """Return the complete premium CSS stylesheet."""
     return f"""
@@ -63,6 +62,16 @@ def get_premium_css() -> str:
             --font-primary: {FONTS["primary"]};
             --font-display: {FONTS["display"]};
             --font-mono: {FONTS["mono"]};
+            --sidebar-hover: #F0F0F2;
+            --focus-ring: rgba(90, 54, 131, 0.12);
+            --thinking-bg: #F3EFF8;
+            --thinking-border: rgba(90, 54, 131, 0.15);
+            --alert-bg: #FFFCF5;
+            --alert-border: #F0E4C8;
+            --alert-ink: #7A5B00;
+            --new-chat-color: #000000;
+            --history-menu-ink: #111111;
+            --user-bubble-shadow: rgba(90, 54, 131, 0.2);
         }}
 
         /* ===== Global Reset & Base ===== */
@@ -204,7 +213,7 @@ def get_premium_css() -> str:
             background: transparent !important;
             color: var(--text-secondary) !important;
             border: none !important;
-            border-radius: var(--radius-sm) !important;
+            border-radius: 0 !important;
             padding: 0.52rem 0.74rem !important;
             font-weight: 500 !important;
             font-size: 0.78rem !important;
@@ -215,7 +224,7 @@ def get_premium_css() -> str:
         }}
 
         section[data-testid="stSidebar"] .stButton > button:hover {{
-            background: #F0F0F2 !important;
+            background: var(--sidebar-hover) !important;
             color: var(--text-primary) !important;
             transform: none !important;
             box-shadow: none !important;
@@ -327,7 +336,7 @@ def get_premium_css() -> str:
         }}
 
         .ens-nav-item:hover {{
-            background: #F0F0F2;
+            background: var(--sidebar-hover);
             color: var(--text-primary);
         }}
 
@@ -546,7 +555,7 @@ def get_premium_css() -> str:
         .stTextInput input:focus,
         .stTextArea textarea:focus {{
             border-color: var(--accent) !important;
-            box-shadow: 0 0 0 3px rgba(90, 54, 131, 0.12) !important;
+            box-shadow: 0 0 0 3px var(--focus-ring) !important;
         }}
 
         .stSelectbox > div > div {{
@@ -695,7 +704,7 @@ def get_premium_css() -> str:
             max-width: 72%;
             font-size: 0.875rem;
             line-height: 1.5;
-            box-shadow: 0 1px 3px rgba(90, 54, 131, 0.2);
+            box-shadow: 0 1px 3px var(--user-bubble-shadow);
         }}
 
         .user-avatar {{
@@ -753,6 +762,41 @@ def get_premium_css() -> str:
             font-size: 0.75rem;
             letter-spacing: 0.03em;
             white-space: nowrap;
+        }}
+
+        .ens-typing-caret {{
+            display: inline-block;
+            width: 0.55rem;
+            height: 1rem;
+            margin-left: 0.2rem;
+            vertical-align: -0.15rem;
+            border-radius: 1px;
+            background: var(--text-tertiary);
+            animation: blink 1s steps(1, end) infinite;
+        }}
+
+        .ens-live-log-box {{
+            margin-bottom: 0.45rem;
+            padding: 0.45rem 0.55rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            line-height: 1.35;
+            max-height: 10rem;
+            overflow-y: auto;
+        }}
+
+        .ens-live-log-line {{
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin-bottom: 0.2rem;
+        }}
+
+        .ens-live-log-line:last-child {{
+            margin-bottom: 0;
         }}
 
         .ens-chat-surface {{
@@ -1135,8 +1179,8 @@ def get_premium_css() -> str:
             align-items: center;
             gap: 0.6rem;
             padding: 0.75rem 1rem;
-            background: #F3EFF8;
-            border: 1px solid rgba(90, 54, 131, 0.15);
+            background: var(--thinking-bg);
+            border: 1px solid var(--thinking-border);
             border-radius: var(--radius-md);
             margin-bottom: 0.75rem;
         }}
@@ -1149,8 +1193,8 @@ def get_premium_css() -> str:
 
         /* ===== Alert ===== */
         .ens-alert {{
-            background: #FFFCF5;
-            border: 1px solid #F0E4C8;
+            background: var(--alert-bg);
+            border: 1px solid var(--alert-border);
             border-radius: var(--radius-lg);
             padding: 0.875rem 1.125rem;
             margin-bottom: 0.75rem;
@@ -1170,12 +1214,12 @@ def get_premium_css() -> str:
         .ens-alert-title {{
             font-size: 0.8125rem;
             font-weight: 600;
-            color: #7A5B00;
+            color: var(--alert-ink);
         }}
 
         .ens-alert-text {{
             font-size: 0.75rem;
-            color: #7A5B00;
+            color: var(--alert-ink);
             margin: 0;
         }}
 
@@ -1357,7 +1401,7 @@ def get_premium_css() -> str:
         /* ===== Conversation History (Sidebar) ===== */
         .ens-history-label {{
             font-family: {FONTS["primary"]};
-            font-size: 0.58rem;
+            font-size: 0.52rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -1381,7 +1425,7 @@ def get_premium_css() -> str:
         }}
 
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-new-chat-anchor) .stButton > button {{
-            color: #000000 !important;
+            color: var(--new-chat-color) !important;
             font-size: 0.66rem !important;
             font-weight: 500 !important;
             min-height: 1.5rem !important;
@@ -1402,6 +1446,15 @@ def get_premium_css() -> str:
             box-shadow: none !important;
         }}
 
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] > *,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] [role="button"],
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] [data-baseweb="button"] {{
+            border: 0 !important;
+            outline: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }}
+
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] > button,
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] > div > button,
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-baseweb="popover"] > button,
@@ -1413,7 +1466,7 @@ def get_premium_css() -> str:
             font-size: 0 !important;
             font-weight: 600 !important;
             line-height: 1 !important;
-            color: #111111 !important;
+            color: var(--history-menu-ink) !important;
             border: 0 !important;
             border-width: 0 !important;
             background: transparent !important;
@@ -1470,15 +1523,15 @@ def get_premium_css() -> str:
             box-shadow: none !important;
             outline: none !important;
             outline-width: 0 !important;
-            color: #111111 !important;
+            color: var(--history-menu-ink) !important;
         }}
 
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopover"] button svg,
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-baseweb="popover"] > button svg,
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) button[aria-haspopup="dialog"] svg {{
-            color: #111111 !important;
-            fill: #111111 !important;
-            stroke: #111111 !important;
+            color: var(--history-menu-ink) !important;
+            fill: var(--history-menu-ink) !important;
+            stroke: var(--history-menu-ink) !important;
         }}
 
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.ens-history-list-anchor) [data-testid="stPopoverPopover"] .stButton > button,
@@ -1489,7 +1542,7 @@ def get_premium_css() -> str:
             color: var(--text-secondary) !important;
             background: var(--surface) !important;
             border: 1px solid var(--border) !important;
-            border-radius: 12px !important;
+            border-radius: 0 !important;
             box-shadow: none !important;
         }}
 

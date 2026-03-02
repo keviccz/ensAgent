@@ -83,12 +83,16 @@ def _detect_provider_from_endpoint(endpoint: str) -> str | None:
     return None
 
 
-def _parse_n_clusters(raw: Dict[str, Any]) -> int:
-    val = raw.get("n_clusters", 7)
+def _parse_int(raw: Dict[str, Any], key: str, default: int) -> int:
+    val = raw.get(key, default)
     try:
         return int(val)
     except Exception:
-        return 7
+        return default
+
+
+def _parse_n_clusters(raw: Dict[str, Any]) -> int:
+    return _parse_int(raw, "n_clusters", 7)
 
 
 def _parse_float(raw: Dict[str, Any], key: str, default: float) -> float:
@@ -125,10 +129,12 @@ def load_pipeline_fields(repo_root: Path | str | None = None) -> Dict[str, Any]:
     api_model = str(raw.get("api_model") or raw.get("api_deployment") or raw.get("azure_deployment") or "")
     return {
         "data_path": str(raw.get("data_path") or ""),
+        "csv_path": str(raw.get("csv_path") or ""),
         "sample_id": str(raw.get("sample_id") or ""),
         "n_clusters": _parse_n_clusters(raw),
         "temperature": _parse_float(raw, "temperature", 0.7),
         "top_p": _parse_float(raw, "top_p", 1.0),
+        "top_degs": _parse_int(raw, "top_degs", 5),
         "api_provider": api_provider,
         "api_key": str(raw.get("api_key") or raw.get("azure_openai_key") or ""),
         "api_endpoint": api_endpoint,
@@ -147,10 +153,11 @@ def save_pipeline_fields(
     Persist selected fields to pipeline_config.yaml.
 
     Supports keys:
-      data_path, sample_id, n_clusters, temperature, top_p, api_provider, api_key, api_endpoint, api_version, api_model, api_deployment
+      data_path, csv_path, sample_id, n_clusters, temperature, top_p, api_provider, api_key, api_endpoint, api_version, api_model, api_deployment
     """
     allowed = {
         "data_path",
+        "csv_path",
         "sample_id",
         "n_clusters",
         "temperature",

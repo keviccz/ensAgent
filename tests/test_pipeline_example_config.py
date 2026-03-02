@@ -16,6 +16,7 @@ class PipelineExampleConfigTests(unittest.TestCase):
         self.assertEqual(data.get("sample_id"), "DLPFC_151507")
         self.assertEqual(data.get("tool_output_dir"), "output/tool_runner/DLPFC_151507")
         self.assertEqual(data.get("best_output_dir"), "output/best/DLPFC_151507")
+        self.assertEqual(data.get("csv_path"), "scoring/input")
         self.assertEqual(data.get("best_truth_file"), "Tool-runner/151507/151507_truth.txt")
         self.assertIn("vlm_off", data)
 

@@ -63,6 +63,13 @@ class EndToEndCliBehaviorTests(unittest.TestCase):
         self.assertIn("run_annotation_multiagent", overrides)
         self.assertFalse(overrides["run_annotation_multiagent"])
 
+    def test_csv_path_override_is_mapped(self) -> None:
+        mod = _load_endtoend_module()
+        parser = mod._build_parser()
+        args = parser.parse_args(["--csv_path", "scoring/input"])
+        overrides = mod._build_cli_overrides(args)
+        self.assertEqual(overrides.get("csv_path"), "scoring/input")
+
     def test_validate_allows_annotation_without_data_path(self) -> None:
         mod = _load_endtoend_module()
         cfg = _Cfg(

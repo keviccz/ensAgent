@@ -35,6 +35,7 @@ def _build_cli_overrides(args: argparse.Namespace) -> dict:
         "data_path": "data_path",
         "sample_id": "sample_id",
         "tool_output_dir": "tool_output_dir",
+        "csv_path": "csv_path",
         "n_clusters": "n_clusters",
         "random_seed": "random_seed",
         "methods": "methods",
@@ -87,6 +88,7 @@ def _build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--data_path", default=None, help="Visium data directory")
     ap.add_argument("--sample_id", default=None, help="Sample identifier")
     ap.add_argument("--tool_output_dir", default=None, help="Tool-runner output directory")
+    ap.add_argument("--csv_path", default=None, help="Scoring CSV input directory (default: scoring/input)")
     ap.add_argument("--n_clusters", type=int, default=None)
     ap.add_argument("--random_seed", type=int, default=None)
     ap.add_argument("--methods", nargs="+", default=None)

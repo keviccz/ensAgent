@@ -230,15 +230,22 @@ def completion_raw(
     top_p: float = 1.0,
     max_tokens: int = 1200,
 ) -> Any:
+    provider = normalize_provider(config.provider) or detect_provider(config.endpoint) or "openai"
+    requested_model = (model or config.model or "gpt-4o")
+    resolved_model = resolve_litellm_model(provider=provider, model=requested_model)
+
     try:
         from litellm import completion  # type: ignore
-    except Exception as exc:
-        raise RuntimeError(
-            "litellm is required for multi-provider runtime. Install with `pip install litellm`."
-        ) from exc
-
-    provider = normalize_provider(config.provider) or detect_provider(config.endpoint) or "openai"
-    resolved_model = resolve_litellm_model(provider=provider, model=(model or config.model))
+    except Exception:
+        return _completion_raw_sdk_fallback(
+            provider=provider,
+            config=config,
+            messages=messages,
+            model=requested_model,
+            temperature=temperature,
+            top_p=top_p,
+            max_tokens=max_tokens,
+        )
 
     kwargs: Dict[str, Any] = {
         "model": resolved_model,
@@ -267,6 +274,93 @@ def completion_raw(
     if config.api_version and provider == "azure":
         kwargs["api_version"] = config.api_version
     return completion(**kwargs)
+
+
+def _completion_raw_sdk_fallback(
+    *,
+    provider: str,
+    config: ProviderConfig,
+    messages: List[Dict[str, Any]],
+    model: str,
+    temperature: float,
+    top_p: float,
+    max_tokens: int,
+) -> Any:
+    normalized_provider = normalize_provider(provider) or "openai"
+    sdk_model = str(model or "").strip() or "gpt-4o"
+    if normalized_provider == "azure" and sdk_model.startswith("azure/"):
+        sdk_model = sdk_model.split("/", 1)[1]
+    if normalized_provider == "anthropic" and sdk_model.startswith("anthropic/"):
+        sdk_model = sdk_model.split("/", 1)[1]
+
+    if normalized_provider == "anthropic":
+        try:
+            import anthropic  # type: ignore
+        except Exception as exc:  # pragma: no cover - depends on optional package
+            raise RuntimeError(
+                "litellm is not available and anthropic SDK is missing. "
+                "Install with `pip install anthropic` or `pip install litellm`."
+            ) from exc
+
+        system_text = ""
+        anthropic_messages: List[Dict[str, Any]] = []
+        for msg in messages:
+            role = str(msg.get("role", "user"))
+            content = msg.get("content", "")
+            if role == "system":
+                text = _extract_text_content(content)
+                if text:
+                    system_text = f"{system_text}\n{text}".strip() if system_text else text
+                continue
+            if role not in {"user", "assistant"}:
+                role = "user"
+            anthropic_messages.append({"role": role, "content": content})
+
+        client = anthropic.Anthropic(api_key=config.api_key)
+        kwargs: Dict[str, Any] = {
+            "model": sdk_model,
+            "messages": anthropic_messages or [{"role": "user", "content": ""}],
+            "temperature": float(temperature),
+            "top_p": float(top_p),
+            "max_tokens": int(max_tokens),
+        }
+        if system_text:
+            kwargs["system"] = system_text
+        response = client.messages.create(**kwargs)
+        text_chunks: List[str] = []
+        for block in getattr(response, "content", []) or []:
+            if getattr(block, "type", "") == "text":
+                text_chunks.append(str(getattr(block, "text", "")))
+        return {"choices": [{"message": {"content": "".join(text_chunks).strip()}}]}
+
+    try:
+        if normalized_provider == "azure":
+            from openai import AzureOpenAI  # type: ignore
+
+            client = AzureOpenAI(
+                api_key=config.api_key,
+                azure_endpoint=config.endpoint,
+                api_version=config.api_version or "2024-12-01-preview",
+            )
+        else:
+            from openai import OpenAI  # type: ignore
+
+            base_url = config.endpoint or None
+            client = OpenAI(api_key=config.api_key, base_url=base_url)
+    except Exception as exc:  # pragma: no cover - depends on optional package
+        raise RuntimeError(
+            "litellm is not available and OpenAI SDK is missing. "
+            "Install with `pip install openai` or `pip install litellm`."
+        ) from exc
+
+    kwargs = {
+        "model": sdk_model,
+        "messages": messages,
+        "temperature": float(temperature),
+        "top_p": float(top_p),
+        "max_tokens": int(max_tokens),
+    }
+    return client.chat.completions.create(**kwargs)
 
 
 def completion_text(
@@ -315,4 +409,3 @@ def completion_json(
         max_tokens=max_tokens,
     )
     return parse_json_text(text)
-

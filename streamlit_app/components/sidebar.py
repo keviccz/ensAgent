@@ -78,6 +78,7 @@ def _init_from_pipeline_config() -> None:
     loaded = load_pipeline_fields()
     for key in [
         "data_path",
+        "csv_path",
         "sample_id",
         "n_clusters",
         "temperature",
@@ -100,6 +101,12 @@ def _init_from_pipeline_config() -> None:
     set_state("_pipeline_config_loaded", True)
 
 
+def initialize_sidebar_state() -> None:
+    """Initialize sidebar-related session state before rendering."""
+    _init_from_pipeline_config()
+    _init_from_saved_config()
+
+
 # ── Navigation definition ───────────────────────────────────────────────
 
 NAV_ITEMS = [
@@ -114,8 +121,7 @@ NAV_ITEMS = [
 
 def render_sidebar() -> None:
     """Render the sidebar with navigation and conversation history."""
-    _init_from_pipeline_config()
-    _init_from_saved_config()
+    initialize_sidebar_state()
 
     with st.sidebar:
         # Brand

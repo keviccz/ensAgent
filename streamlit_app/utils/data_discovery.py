@@ -1,5 +1,5 @@
 """
-Auto-discovery for Visium data path and sample id.
+Auto-discovery for data defaults used by Settings.
 """
 from __future__ import annotations
 
@@ -36,6 +36,62 @@ def _safe_yaml_load(path: Path) -> Dict[str, Any]:
 
 def _sample_from_path(data_path: Path) -> str:
     return data_path.name
+
+
+def _is_csv_input_dir(path: Path) -> bool:
+    return path.exists() and path.is_dir()
+
+
+def _iter_repo_csv_input_candidates(repo_root: Path) -> Iterable[Path]:
+    for spot_csv in repo_root.rglob("*_spot.csv"):
+        parent = spot_csv.parent.resolve()
+        if _is_csv_input_dir(parent):
+            yield parent
+
+
+def _discover_csv_from_pipeline_config(repo_root: Path) -> Dict[str, Any] | None:
+    cfg_path = repo_root / "pipeline_config.yaml"
+    if not cfg_path.exists():
+        return None
+    raw = _safe_yaml_load(cfg_path)
+    csv_path_raw = str(raw.get("csv_path") or "").strip()
+    if not csv_path_raw:
+        return None
+
+    csv_path = _resolve_path(csv_path_raw, repo_root)
+    if not _is_csv_input_dir(csv_path):
+        return None
+    return {
+        "csv_path": str(csv_path),
+        "csv_source": "pipeline_config.yaml",
+        "csv_source_detail": "pipeline_config.yaml",
+    }
+
+
+def _discover_csv_from_default(repo_root: Path) -> Dict[str, Any] | None:
+    default_path = (repo_root / "scoring" / "input").resolve()
+    if not _is_csv_input_dir(default_path):
+        return None
+    return {
+        "csv_path": str(default_path),
+        "csv_source": "scoring/input",
+        "csv_source_detail": str(default_path.as_posix()),
+    }
+
+
+def _discover_csv_from_repo_scan(repo_root: Path) -> Dict[str, Any] | None:
+    candidates: List[Path] = sorted(
+        set(_iter_repo_csv_input_candidates(repo_root)),
+        key=lambda p: (len(p.parts), p.as_posix().lower()),
+    )
+    if not candidates:
+        return None
+    csv_dir = candidates[0]
+    return {
+        "csv_path": str(csv_dir),
+        "csv_source": "repo_scan",
+        "csv_source_detail": csv_dir.as_posix(),
+    }
 
 
 def _normalize_result(
@@ -138,14 +194,20 @@ def _discover_from_repo_scan(repo_root: Path) -> Dict[str, Any] | None:
 
 def discover_data_defaults(repo_root: Path | str | None = None) -> Dict[str, Any]:
     """
-    Discover best default Data Path and Sample ID.
+    Discover best default Data Path / Sample ID / Scoring CSV Path.
 
-    Priority:
+    Data priority:
       1) pipeline_config.yaml
       2) Tool-runner/configs/*.yaml
       3) repository scan for Visium directory markers
+
+    CSV priority:
+      1) pipeline_config.yaml(csv_path)
+      2) repository default scoring/input
+      3) repository scan for *_spot.csv
     """
     root = get_repo_root(repo_root).resolve()
+    data_result: Dict[str, Any] | None = None
 
     for finder in (
         _discover_from_pipeline_config,
@@ -154,12 +216,41 @@ def discover_data_defaults(repo_root: Path | str | None = None) -> Dict[str, Any
     ):
         result = finder(root)
         if result:
-            return result
+            data_result = result
+            break
 
-    return {
-        "data_path": "",
-        "sample_id": "",
-        "source": "none",
-        "source_detail": "",
-        "warnings": ["No valid Visium directory found."],
-    }
+    if not data_result:
+        data_result = {
+            "data_path": "",
+            "sample_id": "",
+            "source": "none",
+            "source_detail": "",
+            "warnings": ["No valid Visium directory found."],
+        }
+
+    csv_result: Dict[str, Any] | None = None
+    for csv_finder in (
+        _discover_csv_from_pipeline_config,
+        _discover_csv_from_default,
+        _discover_csv_from_repo_scan,
+    ):
+        csv_result = csv_finder(root)
+        if csv_result:
+            break
+
+    merged = dict(data_result)
+    if csv_result:
+        merged.update(csv_result)
+    else:
+        merged.update(
+            {
+                "csv_path": "",
+                "csv_source": "none",
+                "csv_source_detail": "",
+            }
+        )
+        warnings = list(merged.get("warnings", []))
+        warnings.append("No valid scoring CSV directory found.")
+        merged["warnings"] = warnings
+
+    return merged

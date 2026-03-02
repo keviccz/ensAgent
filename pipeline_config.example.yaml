@@ -33,6 +33,7 @@ methods:
 # === Path Overrides (leave empty to use defaults) =============
 tool_output_dir: "output/tool_runner/DLPFC_151507"
 best_output_dir: "output/best/DLPFC_151507"
+csv_path: "scoring/input"        # directory containing scoring CSV inputs (*_spot.csv, *_DEGs.csv, *_PATHWAY.csv)
 
 # === Scoring ==================================================
 overwrite_staging: false         # overwrite files in scoring/input when staging

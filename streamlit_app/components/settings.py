@@ -165,6 +165,7 @@ def render_settings() -> None:
             "api_model",
             "api_deployment",
             "data_path",
+            "csv_path",
             "sample_id",
             "n_clusters",
             "temperature",
@@ -187,11 +188,16 @@ def render_settings() -> None:
         if not get_state("data_path") and detection.get("data_path"):
             set_state("data_path", detection["data_path"])
             save_pipeline_fields(data_path=detection["data_path"])
+        if not get_state("csv_path") and detection.get("csv_path"):
+            set_state("csv_path", detection["csv_path"])
+            save_pipeline_fields(csv_path=detection["csv_path"])
         if not get_state("sample_id") and detection.get("sample_id"):
             set_state("sample_id", detection["sample_id"])
             save_pipeline_fields(sample_id=detection["sample_id"])
         set_state("_data_auto_source", detection.get("source", "none"))
         set_state("_data_auto_source_detail", detection.get("source_detail", ""))
+        set_state("_csv_auto_source", detection.get("csv_source", "none"))
+        set_state("_csv_auto_source_detail", detection.get("csv_source_detail", ""))
         set_state("_settings_defaults_loaded", True)
 
     st.markdown(
@@ -433,7 +439,7 @@ def render_settings() -> None:
         <div class="ens-spacer-md"></div>
         <div class="ens-settings-card-title">Data Defaults</div>
         <div class="ens-settings-card-desc">
-            Set data path and sample identifier used by pipeline tools.
+            Set Visium input path, scoring CSV directory, and sample identifier used by pipeline tools.
         </div>
         """,
         unsafe_allow_html=True,
@@ -442,7 +448,13 @@ def render_settings() -> None:
     source_detail = get_state("_data_auto_source_detail", "")
     if source and source != "none":
         source_text = source_detail or source
-        st.caption(f"Auto-detected source: {source_text}")
+        st.caption(f"Data Path / Sample ID source: {source_text}")
+
+    csv_source = get_state("_csv_auto_source", "none")
+    csv_source_detail = get_state("_csv_auto_source_detail", "")
+    if csv_source and csv_source != "none":
+        csv_source_text = csv_source_detail or csv_source
+        st.caption(f"Scoring CSV Path source: {csv_source_text}")
 
     def _on_data_path_change() -> None:
         val = st.session_state._data_path_input
@@ -457,6 +469,19 @@ def render_settings() -> None:
         on_change=_on_data_path_change,
     )
 
+    def _on_csv_path_change() -> None:
+        val = st.session_state._csv_path_input
+        set_state("csv_path", val if val else None)
+        save_pipeline_fields(csv_path=val or "")
+
+    st.text_input(
+        "Scoring CSV Path",
+        value=get_state("csv_path", "") or "",
+        placeholder="scoring/input",
+        key="_csv_path_input",
+        on_change=_on_csv_path_change,
+    )
+
     def _on_sample_id_change() -> None:
         val = st.session_state._sample_id_input
         set_state("sample_id", val if val else None)
@@ -468,6 +493,30 @@ def render_settings() -> None:
         placeholder="e.g. DLPFC_151507",
         key="_sample_id_input",
         on_change=_on_sample_id_change,
+    )
+
+    st.markdown(
+        """
+        <div class="ens-spacer-sm"></div>
+        <div class="ens-settings-card-title">Output & BEST Notes</div>
+        <div class="ens-settings-card-desc">
+            Quick reference for common Tool-runner/BEST path options and naming.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        - **Tool-runner outputs** (default `output/tool_runner/<sample_id>`):
+          `domains/<Method>_<sample_id>_domain.csv`, `spot/<Method>_domain_<sample_id>_spot.csv`,
+          `DEGs/<Method>_domain_<sample_id>_DEGs.csv`, `PATHWAY/<Method>_domain_<sample_id>_PATHWAY.csv`,
+          plus `tool_runner_report.json`.
+        - **BEST outputs** (default `output/best/<sample_id>`): `BEST_<sample_id>_spot.csv`,
+          `BEST_<sample_id>_DEGs.csv`, `BEST_<sample_id>_PATHWAY.csv`, and `<sample_id>_result.png`.
+        - **Truth file for BEST** (`best_truth_file`): optional `spot_id<TAB>label` file used to compute ARI (`ari.json`).
+        - **Smoothing KNN in BEST** (`best_smooth_knn`): optional kNN majority smoothing over spot coordinates to reduce local label noise.
+        """,
+        unsafe_allow_html=False,
     )
 
     st.markdown(

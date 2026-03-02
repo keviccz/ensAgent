@@ -22,6 +22,7 @@ class ConfigBridgeTests(unittest.TestCase):
                 api_model="gpt-4o",
                 api_deployment="gpt-4o",
                 data_path="D:/data/151507",
+                csv_path="D:/csv/scoring_input",
                 sample_id="DLPFC_151507",
                 n_clusters=9,
             )
@@ -34,6 +35,7 @@ class ConfigBridgeTests(unittest.TestCase):
             self.assertEqual(loaded["api_model"], "gpt-4o")
             self.assertEqual(loaded["api_deployment"], "gpt-4o")
             self.assertEqual(loaded["data_path"], "D:/data/151507")
+            self.assertEqual(loaded["csv_path"], "D:/csv/scoring_input")
             self.assertEqual(loaded["sample_id"], "DLPFC_151507")
             self.assertEqual(loaded["n_clusters"], 9)
 
@@ -43,6 +45,7 @@ class ConfigBridgeTests(unittest.TestCase):
             self.assertEqual(raw.get("azure_api_version"), "2024-12-01-preview")
             self.assertEqual(raw.get("azure_deployment"), "gpt-4o")
             self.assertEqual(raw.get("n_clusters"), 9)
+            self.assertEqual(raw.get("csv_path"), "D:/csv/scoring_input")
 
     def test_n_clusters_is_saved_as_integer(self) -> None:
         from streamlit_app.utils.config_bridge import load_pipeline_fields, save_pipeline_fields

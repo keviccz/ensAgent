@@ -1,24 +1,2 @@
-langchain
-openai==1.109.1
-litellm>=1.57.0
-pandas
-gseapy
-scikit-learn
-SQLAlchemy
-requests
-numpy
-scipy
-tqdm
-matplotlib
-tenacity==8.5.0
-langchain-openai==0.1.0
-seaborn
-langchain-community
-chromadb
-jinja2
-scanpy
-anndata 
-sentence-transformers 
-# 图片处理相关依赖已移除
-# pillow
-# azure-ai-vision
+# Deprecated shim: use root requirements.txt as the single source of truth.
+-r ../requirements.txt

@@ -10,6 +10,11 @@ from typing import Any, Dict, List, Optional
 
 from ensagent_tools.config_manager import PipelineConfig
 from ensagent_tools.env_manager import resolve_conda_executable
+from ensagent_tools.subprocess_stream import (
+    CancelCheck,
+    ProgressCallback,
+    run_subprocess_streaming,
+)
 
 
 def run_tool_runner(
@@ -21,6 +26,8 @@ def run_tool_runner(
     n_clusters: int | None = None,
     random_seed: int | None = None,
     methods: Optional[List[str]] = None,
+    progress_callback: ProgressCallback | None = None,
+    cancel_check: CancelCheck | None = None,
 ) -> Dict[str, Any]:
     """Execute ``Tool-runner/orchestrator.py`` with the given (or config-default) parameters."""
     repo = cfg.repo_root()
@@ -66,14 +73,35 @@ def run_tool_runner(
         cmd += ["--methods", *meths]
 
     print(f"[Tool] Running Tool-runner -> {od}")
-    p = subprocess.run(cmd, cwd=str(repo), check=False)
+    if progress_callback is None and cancel_check is None:
+        p = subprocess.run(cmd, cwd=str(repo), check=False)
+        run_result: Dict[str, Any] = {
+            "returncode": int(p.returncode),
+            "interrupted": False,
+            "log_line_count": 0,
+            "stdout_tail": [],
+        }
+    else:
+        run_result = run_subprocess_streaming(
+            cmd=cmd,
+            cwd=repo,
+            tool="run_tool_runner",
+            stage="tool_runner",
+            progress_callback=progress_callback,
+            cancel_check=cancel_check,
+        )
+    exit_code = int(run_result.get("returncode", 1))
+    interrupted = bool(run_result.get("interrupted", False))
     return {
-        "ok": p.returncode == 0,
-        "exit_code": p.returncode,
+        "ok": (exit_code == 0 and not interrupted),
+        "exit_code": exit_code,
+        "interrupted": interrupted,
         "output_dir": od,
         "conda_exe": str(conda_exe),
         "conda_source": resolved_conda.get("source", ""),
         "n_clusters_used": int(nc),
         "random_seed_used": int(rs),
         "methods_used": list(meths) if meths else [],
+        "log_tail": run_result.get("stdout_tail", []),
+        "log_line_count": int(run_result.get("log_line_count", 0)),
     }

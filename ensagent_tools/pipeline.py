@@ -17,6 +17,7 @@ from ensagent_tools.tool_runner import run_tool_runner
 from ensagent_tools.scoring import run_scoring
 from ensagent_tools.best_builder import run_best_builder
 from ensagent_tools.annotation import run_annotation
+from ensagent_tools.subprocess_stream import CancelCheck, ProgressCallback
 
 
 _DOMAIN_PREFIX_RE = re.compile(r"^(?P<method>[^_]+)_domain_(?P<rest>.+)$")
@@ -80,18 +81,32 @@ def stage_toolrunner_outputs(
     return counts
 
 
-def run_full_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
+def run_full_pipeline(
+    cfg: PipelineConfig,
+    *,
+    progress_callback: ProgressCallback | None = None,
+    cancel_check: CancelCheck | None = None,
+) -> Dict[str, Any]:
     """Execute the complete A → B → C → D pipeline based on *cfg*."""
     repo = cfg.repo_root()
     results: Dict[str, Any] = {"ok": True, "phases": {}}
+    run_opts: Dict[str, Any] = {}
+    if progress_callback is not None:
+        run_opts["progress_callback"] = progress_callback
+    if cancel_check is not None:
+        run_opts["cancel_check"] = cancel_check
 
     tool_out = cfg.resolved_tool_output_dir()
-    scoring_input = repo / "scoring" / "input"
+    scoring_input = cfg.resolved_scoring_input_dir()
     best_out = cfg.resolved_best_output_dir()
 
     # --- Stage A: Tool-runner ---
     if not cfg.skip_tool_runner:
-        res = run_tool_runner(cfg, output_dir=str(tool_out))
+        res = run_tool_runner(
+            cfg,
+            output_dir=str(tool_out),
+            **run_opts,
+        )
         results["phases"]["tool_runner"] = res
         if not res["ok"]:
             results["ok"] = False
@@ -99,21 +114,32 @@ def run_full_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
 
     # --- Stage B: Scoring ---
     if not cfg.skip_scoring:
-        # --- Staging (only required before scoring) ---
-        try:
-            stage_toolrunner_outputs(
-                tool_output_dir=tool_out,
-                scoring_input_dir=scoring_input,
-                sample_id=cfg.sample_id,
-                overwrite=cfg.overwrite_staging,
-            )
-            results["phases"]["staging"] = {"ok": True}
-        except Exception as e:
-            results["phases"]["staging"] = {"ok": False, "error": str(e)}
-            results["ok"] = False
-            return results
+        if not cfg.skip_tool_runner:
+            # --- Staging (only required when Tool-runner outputs are expected) ---
+            try:
+                stage_toolrunner_outputs(
+                    tool_output_dir=tool_out,
+                    scoring_input_dir=scoring_input,
+                    sample_id=cfg.sample_id,
+                    overwrite=cfg.overwrite_staging,
+                )
+                results["phases"]["staging"] = {"ok": True}
+            except Exception as e:
+                results["phases"]["staging"] = {"ok": False, "error": str(e)}
+                results["ok"] = False
+                return results
+        else:
+            results["phases"]["staging"] = {
+                "ok": True,
+                "skipped": True,
+                "reason": "skip_tool_runner=true; using csv_path",
+            }
 
-        res = run_scoring(cfg)
+        res = run_scoring(
+            cfg,
+            input_dir=str(scoring_input),
+            **run_opts,
+        )
         results["phases"]["scoring"] = res
         if not res["ok"]:
             results["ok"] = False
@@ -124,7 +150,11 @@ def run_full_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
 
     # --- Stage C: BEST builder ---
     if cfg.run_best:
-        res = run_best_builder(cfg, output_dir=str(best_out))
+        res = run_best_builder(
+            cfg,
+            output_dir=str(best_out),
+            **run_opts,
+        )
         results["phases"]["best_builder"] = res
         if not res["ok"]:
             results["ok"] = False
@@ -132,7 +162,11 @@ def run_full_pipeline(cfg: PipelineConfig) -> Dict[str, Any]:
 
     # --- Stage D: Multi-agent annotation ---
     if cfg.run_annotation_multiagent:
-        res = run_annotation(cfg, data_dir=str(best_out))
+        res = run_annotation(
+            cfg,
+            data_dir=str(best_out),
+            **run_opts,
+        )
         results["phases"]["annotation"] = res
         if not res["ok"]:
             results["ok"] = False

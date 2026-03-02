@@ -22,6 +22,12 @@ class SidebarBehaviorTests(unittest.TestCase):
         self.assertNotIn('st.popover("⌄"', text)
         self.assertIn('st.popover("", use_container_width=True)', text)
 
+    def test_sidebar_does_not_render_theme_toggle(self) -> None:
+        p = Path(__file__).resolve().parent.parent / "streamlit_app" / "components" / "sidebar.py"
+        text = p.read_text(encoding="utf-8")
+        self.assertNotIn("theme_toggle_btn", text)
+        self.assertNotIn("ens-theme-toggle-anchor", text)
+
 
 if __name__ == "__main__":
     unittest.main()

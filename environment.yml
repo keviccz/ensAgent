@@ -23,18 +23,5 @@ dependencies:
   - plotly
   - streamlit
   - pip:
-      # LLM & LangChain (scoring + annotation + chat agent)
-      - openai==1.109.1
-      - litellm>=1.57.0
-      - langchain
-      - langchain-community
-      - langchain-openai==0.1.0
-      - chromadb
-      - sentence-transformers
-      # Retry logic
-      - tenacity==8.5.0
-      # Bioinformatics (scoring) - use pip for faster install
-      - scanpy
-      - anndata
-      # Pathway analysis
-      - gseapy
+      # Single Python dependency source (root file)
+      - -r requirements.txt

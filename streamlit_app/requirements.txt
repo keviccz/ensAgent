@@ -1,7 +1,2 @@
-# EnsAgent Streamlit UI Requirements
-streamlit>=1.32.0
-openai>=1.0.0
-litellm>=1.57.0
-pandas>=2.0.0
-numpy>=1.24.0
-plotly>=5.18.0
+# Deprecated shim: use root requirements.txt as the single source of truth.
+-r ../requirements.txt

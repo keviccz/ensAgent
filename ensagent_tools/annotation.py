@@ -6,9 +6,57 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any, Dict
 
 from ensagent_tools.config_manager import PipelineConfig
+from ensagent_tools.subprocess_stream import (
+    CancelCheck,
+    ProgressCallback,
+    run_subprocess_streaming,
+)
+
+
+def _run_command(
+    *,
+    cmd: list[str],
+    cwd: Path,
+    progress_callback: ProgressCallback | None,
+    cancel_check: CancelCheck | None,
+) -> Dict[str, Any]:
+    if progress_callback is None and cancel_check is None:
+        p = subprocess.run(cmd, cwd=str(cwd), check=False)
+        return {
+            "returncode": int(p.returncode),
+            "interrupted": False,
+            "log_line_count": 0,
+            "stdout_tail": [],
+        }
+    return run_subprocess_streaming(
+        cmd=cmd,
+        cwd=cwd,
+        tool="run_annotation",
+        stage="annotation",
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+    )
+
+
+def _candidate_best_files(sample_id: str) -> dict[str, tuple[str, ...]]:
+    return {
+        "spot": (
+            f"BEST_{sample_id}_spot.csv",
+            f"BEST_DLPFC_{sample_id}_spot.csv",
+        ),
+        "DEGs": (
+            f"BEST_{sample_id}_DEGs.csv",
+            f"BEST_DLPFC_{sample_id}_DEGs.csv",
+        ),
+        "PATHWAY": (
+            f"BEST_{sample_id}_PATHWAY.csv",
+            f"BEST_DLPFC_{sample_id}_PATHWAY.csv",
+        ),
+    }
 
 
 def run_annotation(
@@ -17,6 +65,8 @@ def run_annotation(
     data_dir: str = "",
     sample_id: str = "",
     domain: str = "",
+    progress_callback: ProgressCallback | None = None,
+    cancel_check: CancelCheck | None = None,
 ) -> Dict[str, Any]:
     """Execute annotation via ``scoring/scoring.py --annotation_multiagent``."""
     repo = cfg.repo_root()
@@ -29,6 +79,23 @@ def run_annotation(
 
     if not sid or not dd:
         return {"ok": False, "error": "data_dir and sample_id are required"}
+
+    data_dir_path = Path(dd)
+    if not data_dir_path.exists():
+        return {"ok": False, "error": f"annotation data_dir not found: {data_dir_path}"}
+
+    missing_labels: list[str] = []
+    for label, candidates in _candidate_best_files(str(sid)).items():
+        if not any((data_dir_path / name).exists() for name in candidates):
+            missing_labels.append(label)
+    if missing_labels:
+        return {
+            "ok": False,
+            "error": (
+                "Missing BEST artifacts required for annotation in "
+                f"{data_dir_path}: {', '.join(missing_labels)}"
+            ),
+        }
 
     cmd = [
         sys.executable, str(script),
@@ -59,5 +126,19 @@ def run_annotation(
         cmd += ["--domain", str(domain)]
 
     print(f"[Tool] Running multi-agent annotation -> {dd}")
-    p = subprocess.run(cmd, cwd=str(script.parent), check=False)
-    return {"ok": p.returncode == 0, "exit_code": p.returncode, "data_dir": dd}
+    run_result = _run_command(
+        cmd=cmd,
+        cwd=script.parent,
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+    )
+    exit_code = int(run_result.get("returncode", 1))
+    interrupted = bool(run_result.get("interrupted", False))
+    return {
+        "ok": (exit_code == 0 and not interrupted),
+        "exit_code": exit_code,
+        "interrupted": interrupted,
+        "data_dir": dd,
+        "log_tail": run_result.get("stdout_tail", []),
+        "log_line_count": int(run_result.get("log_line_count", 0)),
+    }

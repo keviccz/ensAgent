@@ -71,7 +71,7 @@ TOOL_SCHEMAS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "run_scoring",
-            "description": "Run Scoring (Stage B): LLM evaluation and consensus matrix generation.",
+            "description": "Run Scoring (Stage B): LLM evaluation and consensus matrix generation. Defaults to config csv_path or scoring/input.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -167,7 +167,7 @@ TOOL_REGISTRY: Dict[str, Callable[..., Dict[str, Any]]] = {
     "run_scoring": lambda cfg, **kw: run_scoring(cfg, **kw),
     "run_best_builder": lambda cfg, **kw: run_best_builder(cfg, **kw),
     "run_annotation": lambda cfg, **kw: run_annotation(cfg, **kw),
-    "run_end_to_end": lambda cfg, **kw: run_full_pipeline(cfg),
+    "run_end_to_end": lambda cfg, **kw: run_full_pipeline(cfg, **kw),
     "show_config": lambda cfg, **kw: show_config(cfg),
     "set_config": lambda cfg, **kw: set_config_value(
         key=kw.get("name", ""), value=kw.get("value", ""),
@@ -175,12 +175,52 @@ TOOL_REGISTRY: Dict[str, Callable[..., Dict[str, Any]]] = {
 }
 
 
-def execute_tool(name: str, args: Dict[str, Any], cfg: PipelineConfig) -> Dict[str, Any]:
+def _is_progress_kwarg_mismatch(exc: TypeError) -> bool:
+    msg = str(exc)
+    if "unexpected keyword argument" not in msg:
+        return False
+    return ("progress_callback" in msg) or ("cancel_check" in msg)
+
+
+def execute_tool(
+    name: str,
+    args: Dict[str, Any],
+    cfg: PipelineConfig,
+    *,
+    progress_callback: Callable[[Dict[str, Any]], None] | None = None,
+    cancel_check: Callable[[], bool] | None = None,
+) -> Dict[str, Any]:
     """Look up *name* in the registry and call it with *cfg* + *args*."""
     fn = TOOL_REGISTRY.get(name)
     if fn is None:
         return {"ok": False, "error": f"Unknown tool: {name}"}
     try:
-        return fn(cfg, **args)
+        effective_args = dict(args or {})
+        if progress_callback is not None:
+            effective_args["progress_callback"] = progress_callback
+        if cancel_check is not None:
+            effective_args["cancel_check"] = cancel_check
+        return fn(cfg, **effective_args)
+    except TypeError as e:
+        if not _is_progress_kwarg_mismatch(e):
+            return {"ok": False, "error": str(e)}
+        compat_args = dict(effective_args)
+        compat_args.pop("progress_callback", None)
+        compat_args.pop("cancel_check", None)
+        try:
+            out = fn(cfg, **compat_args)
+        except Exception as retry_exc:
+            return {"ok": False, "error": str(retry_exc)}
+        if isinstance(out, dict):
+            patched = dict(out)
+            patched.setdefault("compat_retry_used", True)
+            patched.setdefault("compat_retry_reason", "legacy_tool_signature_missing_progress_callback_or_cancel_check")
+            return patched
+        return {
+            "ok": True,
+            "result": out,
+            "compat_retry_used": True,
+            "compat_retry_reason": "legacy_tool_signature_missing_progress_callback_or_cancel_check",
+        }
     except Exception as e:
         return {"ok": False, "error": str(e)}

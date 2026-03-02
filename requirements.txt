@@ -1,0 +1,40 @@
+# EnsAgent unified Python requirements (root canonical source)
+# Use with: mamba activate ensagent && python -m pip install -r requirements.txt
+
+# Core runtime
+openai==1.109.1
+litellm>=1.57.0
+python-dotenv
+pillow
+requests
+tenacity==8.5.0
+
+# LLM orchestration
+langchain
+langchain-community
+langchain-openai==0.1.0
+chromadb
+sentence-transformers
+
+# Data/scoring
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+seaborn
+tqdm
+sqlalchemy
+jinja2
+scanpy
+anndata
+gseapy
+
+# UI
+streamlit>=1.32.0
+plotly>=5.18.0
+
+# pic_analyze web/runtime deps
+flask
+flask-cors
+werkzeug

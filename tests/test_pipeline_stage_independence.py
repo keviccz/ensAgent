@@ -29,6 +29,7 @@ class _DummyCfg:
         self.run_annotation_multiagent = run_annotation
         self.overwrite_staging = False
         self.sample_id = "DLPFC_151507"
+        self.csv_path = "custom_scoring_input"
 
     def repo_root(self) -> Path:
         return self._repo_root
@@ -38,6 +39,9 @@ class _DummyCfg:
 
     def resolved_best_output_dir(self) -> Path:
         return self._repo_root / "output" / "best" / self.sample_id
+
+    def resolved_scoring_input_dir(self) -> Path:
+        return self._repo_root / self.csv_path
 
 
 class PipelineStageIndependenceTests(unittest.TestCase):
@@ -69,6 +73,29 @@ class PipelineStageIndependenceTests(unittest.TestCase):
             run_best=False,
             run_annotation=False,
         )
+        cfg.skip_tool_runner = False
+
+        with patch.object(mod, "run_tool_runner", return_value={"ok": True}) as mock_tool, patch.object(
+            mod, "stage_toolrunner_outputs"
+        ) as mock_stage, patch.object(
+            mod, "run_scoring", return_value={"ok": True}
+        ) as mock_scoring:
+            result = mod.run_full_pipeline(cfg)
+
+        self.assertTrue(result["ok"])
+        mock_tool.assert_called_once()
+        mock_stage.assert_called_once()
+        mock_scoring.assert_called_once_with(cfg, input_dir=str(cfg.resolved_scoring_input_dir()))
+
+    def test_skip_tool_runner_uses_csv_path_without_staging(self) -> None:
+        mod = _load_pipeline_module()
+        cfg = _DummyCfg(
+            repo_root=Path(__file__).resolve().parent.parent,
+            skip_scoring=False,
+            run_best=False,
+            run_annotation=False,
+        )
+        cfg.skip_tool_runner = True
 
         with patch.object(mod, "stage_toolrunner_outputs") as mock_stage, patch.object(
             mod, "run_scoring", return_value={"ok": True}
@@ -76,8 +103,9 @@ class PipelineStageIndependenceTests(unittest.TestCase):
             result = mod.run_full_pipeline(cfg)
 
         self.assertTrue(result["ok"])
-        mock_stage.assert_called_once()
-        mock_scoring.assert_called_once()
+        mock_stage.assert_not_called()
+        mock_scoring.assert_called_once_with(cfg, input_dir=str(cfg.resolved_scoring_input_dir()))
+        self.assertTrue(result["phases"]["staging"]["skipped"])
 
 
 if __name__ == "__main__":

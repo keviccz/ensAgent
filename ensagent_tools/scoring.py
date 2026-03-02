@@ -4,11 +4,56 @@ Tool: run the Scoring pipeline (Stage B).
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any, Dict
 
 from ensagent_tools.config_manager import PipelineConfig
+from ensagent_tools.subprocess_stream import (
+    CancelCheck,
+    ProgressCallback,
+    run_subprocess_streaming,
+)
+
+
+def _emit_progress(progress_callback: ProgressCallback | None, payload: Dict[str, Any]) -> None:
+    if progress_callback is None:
+        return
+    try:
+        progress_callback(payload)
+    except Exception:
+        return
+
+
+def _run_command(
+    *,
+    cmd: list[str],
+    cwd: Path,
+    tool: str,
+    stage: str,
+    progress_callback: ProgressCallback | None,
+    cancel_check: CancelCheck | None,
+    env: Dict[str, str] | None = None,
+) -> Dict[str, Any]:
+    if progress_callback is None and cancel_check is None:
+        p = subprocess.run(cmd, cwd=str(cwd), check=False, env=env)
+        return {
+            "returncode": int(p.returncode),
+            "interrupted": False,
+            "log_line_count": 0,
+            "stdout_tail": [],
+        }
+    return run_subprocess_streaming(
+        cmd=cmd,
+        cwd=cwd,
+        tool=tool,
+        stage=stage,
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+        env=env,
+    )
 
 
 def run_scoring(
@@ -19,6 +64,9 @@ def run_scoring(
     vlm_off: bool | None = None,
     temperature: float | None = None,
     top_p: float | None = None,
+    top_degs: int | None = None,
+    progress_callback: ProgressCallback | None = None,
+    cancel_check: CancelCheck | None = None,
 ) -> Dict[str, Any]:
     """Execute ``scoring/scoring.py``."""
     repo = cfg.repo_root()
@@ -26,9 +74,12 @@ def run_scoring(
     if not script.exists():
         return {"ok": False, "error": f"Not found: {script}"}
 
+    effective_input_dir = input_dir or str(cfg.resolved_scoring_input_dir())
+    subprocess_env = dict(os.environ)
+    subprocess_env.setdefault("PYTHONIOENCODING", "utf-8")
+    subprocess_env.setdefault("PYTHONUTF8", "1")
     cmd = [sys.executable, str(script)]
-    if input_dir:
-        cmd += ["--input_dir", str(input_dir)]
+    cmd += ["--input_dir", str(effective_input_dir)]
     if output_dir:
         cmd += ["--output_dir", str(output_dir)]
     if cfg.api_provider:
@@ -57,13 +108,100 @@ def run_scoring(
     effective_vlm_off = cfg.vlm_off if vlm_off is None else bool(vlm_off)
     if effective_vlm_off:
         cmd.append("--vlm_off")
+    effective_top_degs = cfg.top_degs if top_degs is None else int(top_degs)
+    cmd += ["--top_n_deg", str(effective_top_degs)]
+
+    pic_scores_file = script.parent / "pic_analyze" / "output" / "all_domains_scores.json"
+    pic_analyze_autorun = False
+    pic_analyze_result: Dict[str, Any] | None = None
+    if (not effective_vlm_off) and (not pic_scores_file.exists()):
+        pic_script = script.parent / "pic_analyze" / "run.py"
+        if not pic_script.exists():
+            return {
+                "ok": False,
+                "error": (
+                    f"Visual score file missing: {pic_scores_file}. "
+                    f"Auto-run script not found: {pic_script}"
+                ),
+            }
+
+        pic_analyze_autorun = True
+        _emit_progress(
+            progress_callback,
+            {
+                "kind": "tool_log",
+                "tool": "run_scoring",
+                "stage": "scoring",
+                "level": "warning",
+                "message": (
+                    "Visual score file not found; running pic_analyze first: "
+                    f"{pic_scores_file}"
+                ),
+            },
+        )
+        pic_cmd = [sys.executable, str(pic_script)]
+        pic_analyze_result = _run_command(
+            cmd=pic_cmd,
+            cwd=pic_script.parent,
+            tool="run_scoring",
+            stage="scoring_visual",
+            progress_callback=progress_callback,
+            cancel_check=cancel_check,
+            env=subprocess_env,
+        )
+        pic_exit = int(pic_analyze_result.get("returncode", 1))
+        pic_interrupted = bool(pic_analyze_result.get("interrupted", False))
+        if pic_interrupted:
+            return {
+                "ok": False,
+                "exit_code": pic_exit,
+                "interrupted": True,
+                "error": "Scoring interrupted while running pic_analyze pre-step.",
+                "pic_analyze_autorun": True,
+                "pic_analyze_exit_code": pic_exit,
+                "log_tail": pic_analyze_result.get("stdout_tail", []),
+            }
+        if pic_exit != 0 or not pic_scores_file.exists():
+            return {
+                "ok": False,
+                "exit_code": pic_exit,
+                "error": (
+                    "Visual score file missing and pic_analyze pre-step failed. "
+                    f"Expected file: {pic_scores_file}"
+                ),
+                "pic_analyze_autorun": True,
+                "pic_analyze_exit_code": pic_exit,
+                "log_tail": pic_analyze_result.get("stdout_tail", []),
+            }
 
     print(f"[Tool] Running scoring")
-    p = subprocess.run(cmd, cwd=str(script.parent), check=False)
+    run_result = _run_command(
+        cmd=cmd,
+        cwd=script.parent,
+        tool="run_scoring",
+        stage="scoring",
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+        env=subprocess_env,
+    )
+    exit_code = int(run_result.get("returncode", 1))
+    interrupted = bool(run_result.get("interrupted", False))
     return {
-        "ok": p.returncode == 0,
-        "exit_code": p.returncode,
+        "ok": (exit_code == 0 and not interrupted),
+        "exit_code": exit_code,
+        "interrupted": interrupted,
+        "input_dir_used": str(effective_input_dir),
         "temperature_used": float(effective_temperature),
         "top_p_used": float(effective_top_p),
         "vlm_off_used": bool(effective_vlm_off),
+        "top_degs_used": int(effective_top_degs),
+        "pic_analyze_autorun": pic_analyze_autorun,
+        "pic_analyze_exit_code": (
+            int(pic_analyze_result.get("returncode", 0))
+            if isinstance(pic_analyze_result, dict)
+            else None
+        ),
+        "visual_scores_file": str(pic_scores_file),
+        "log_tail": run_result.get("stdout_tail", []),
+        "log_line_count": int(run_result.get("log_line_count", 0)),
     }

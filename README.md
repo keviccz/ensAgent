@@ -40,11 +40,19 @@ Miniforge ships with `mamba`, which is significantly faster than `conda`.
 # Main environment (LLM libs, Streamlit, etc.)
 mamba env create -f environment.yml
 mamba activate ensagent
+python -m pip install -r requirements.txt
 
 # Tool-runner environments (clustering methods)
 mamba env create -f envs/R_environment.yml    # R: IRIS, BASS, DR-SC, BayesSpace
 mamba env create -f envs/PY_environment.yml   # PY: SEDR, GraphST, STAGATE
 mamba env create -f envs/PY2_environment.yml  # PY2: stLearn
+```
+
+When dependencies are updated, run:
+
+```bash
+mamba activate ensagent
+python -m pip install -r requirements.txt
 ```
 
 ### 3. Configure
@@ -57,21 +65,28 @@ Edit `pipeline_config.yaml` -- at minimum set `data_path` and `sample_id`:
 
 ```yaml
 data_path: "Tool-runner/151507"
+csv_path: "scoring/input"
 sample_id: "DLPFC_151507"
 tool_output_dir: "output/tool_runner/DLPFC_151507"
 best_output_dir: "output/best/DLPFC_151507"
 best_truth_file: "Tool-runner/151507/151507_truth.txt"
 ```
 
-`streamlit_app` Settings writes API values and data/sample defaults to `pipeline_config.yaml`.
-On first load, Settings auto-detects `data_path` and `sample_id` in this order:
+`streamlit_app` Settings writes API values and data defaults to `pipeline_config.yaml`.
+On first load, Settings auto-detects values when fields are empty:
 
-1. `pipeline_config.yaml`
-2. `Tool-runner/configs/*.yaml`
-3. repo scan for Visium markers (`filtered_feature_bc_matrix.h5` + `spatial/`)
-   `api_config.py` is deprecated and kept only for backward-compatible fallback.
-   Settings also persists runtime parameters (`temperature`, `top_p`, `n_clusters`) to `pipeline_config.yaml`.
-   Float values are normalized on write to avoid representation noise (for example `1.0` instead of `0.9999999999999999`).
+1. `data_path` / `sample_id`:
+   - `pipeline_config.yaml`
+   - `Tool-runner/configs/*.yaml`
+   - repo scan for Visium markers (`filtered_feature_bc_matrix.h5` + `spatial/`)
+2. `csv_path`:
+   - `pipeline_config.yaml` (`csv_path`)
+   - default `scoring/input`
+   - repo scan for folders containing `*_spot.csv`
+
+`api_config.py` is deprecated and kept only for backward-compatible fallback.
+Settings also persists runtime parameters (`temperature`, `top_p`, `n_clusters`) to `pipeline_config.yaml`.
+Float values are normalized on write to avoid representation noise (for example `1.0` instead of `0.9999999999999999`).
 
 Set provider credentials via environment variables (recommended):
 
@@ -149,7 +164,7 @@ EnsAgent/
 # Stage A only: Tool-runner
 python Tool-runner/orchestrator.py --config Tool-runner/configs/DLPFC_151507.yaml
 
-# Stage B only: Scoring (reads from scoring/input/)
+# Stage B only: Scoring (reads from csv_path, default: scoring/input/)
 cd scoring && python scoring.py
 
 # Stage B with explicit provider overrides (multi-provider)
@@ -270,6 +285,16 @@ output/
 └── (scoring outputs under scoring/output/)
 ```
 
+Common Tool-runner file naming patterns:
+- `domains/<Method>_<sample_id>_domain.csv`
+- `spot/<Method>_domain_<sample_id>_spot.csv`
+- `DEGs/<Method>_domain_<sample_id>_DEGs.csv`
+- `PATHWAY/<Method>_domain_<sample_id>_PATHWAY.csv`
+
+BEST runtime options:
+- `best_truth_file`: optional truth file (`spot_id<TAB>label`) used to compute ARI (`ari.json`).
+- `best_smooth_knn`: optional kNN majority smoothing on BEST labels to reduce local noise.
+
 ## Configuration Reference
 
 See `pipeline_config.example.yaml` for all available options with comments.
@@ -279,7 +304,12 @@ Key parameters:
 | Parameter                   | Default    | Description                                      |
 | --------------------------- | ---------- | ------------------------------------------------ |
 | `data_path`                 | (required) | Path to Visium data directory                    |
+| `csv_path`                  | `scoring/input` | Directory containing Stage B CSV inputs    |
 | `sample_id`                 | (required) | Sample identifier                                |
+| `tool_output_dir`           | `output/tool_runner/<sample_id>` | Stage A output directory override |
+| `best_output_dir`           | `output/best/<sample_id>` | Stage C output directory override |
+| `best_truth_file`           | `""`       | Optional truth labels (`spot_id<TAB>label`) for ARI |
+| `best_smooth_knn`           | `false`    | Enable kNN smoothing on BEST spot labels |
 | `api_provider`              | `""`       | UI-selected provider in Streamlit Settings       |
 | `api_key`                   | `""`       | API key for selected provider                    |
 | `api_endpoint`              | `""`       | API base endpoint                                |

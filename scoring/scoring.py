@@ -4,6 +4,8 @@ warnings.filterwarnings("ignore", category=UserWarning)
 import logging
 import re
 import json
+import subprocess
+import sys
 import traceback
 logging.getLogger("langchain").setLevel(logging.ERROR)
 
@@ -20,6 +22,7 @@ from cli_selectors import parse_selector_overrides
 from typing import List, Dict
 from sklearn.preprocessing import MinMaxScaler
 from decimal import Decimal, getcontext
+from pathlib import Path
 
 # 安全地导入配置，兼容有无config.py文件的情况
 from config_loader import get_legacy_config
@@ -549,8 +552,41 @@ if args.vlm_off:
     evaluator.use_visual_integration = False
     print(f"[Info] 已按 --vlm_off 关闭视觉评分整合，使用传统评分方式")
 else:
+    script_dir = Path(__file__).resolve().parent
+    pic_analyze_dir = script_dir / "pic_analyze"
+    visual_scores_file = pic_analyze_dir / "output" / "all_domains_scores.json"
+    if not visual_scores_file.exists():
+        pic_script = pic_analyze_dir / "run.py"
+        if not pic_script.exists():
+            print(f"[Error] 视觉评分文件不存在且未找到预处理脚本: {pic_script}")
+            log(f"视觉评分文件不存在且未找到预处理脚本: {pic_script}")
+            exit(1)
+
+        print(f"[Info] 视觉评分文件缺失，先运行 pic_analyze: {pic_script}")
+        log(f"视觉评分文件缺失，先运行 pic_analyze: {pic_script}")
+        try:
+            pic_proc = subprocess.run(
+                [sys.executable, str(pic_script)],
+                cwd=str(pic_analyze_dir),
+                check=False,
+            )
+        except Exception as pic_err:
+            print(f"[Error] 运行 pic_analyze 失败: {pic_err}")
+            log(f"运行 pic_analyze 失败: {pic_err}")
+            exit(1)
+
+        if int(pic_proc.returncode) != 0:
+            print(f"[Error] pic_analyze 运行失败，退出码: {pic_proc.returncode}")
+            log(f"pic_analyze 运行失败，退出码: {pic_proc.returncode}")
+            exit(1)
+
+        if not visual_scores_file.exists():
+            print(f"[Error] pic_analyze 已运行但仍未生成视觉评分文件: {visual_scores_file}")
+            log(f"pic_analyze 已运行但仍未生成视觉评分文件: {visual_scores_file}")
+            exit(1)
+
     print(f"[Info] 尝试加载视觉评分数据...")
-    visual_loaded = evaluator.load_visual_scores("pic_analyze")
+    visual_loaded = evaluator.load_visual_scores(str(pic_analyze_dir))
     if visual_loaded:
         print(f"[Info] 视觉评分整合已启用，将影响最终评分")
     else:

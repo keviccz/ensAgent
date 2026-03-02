@@ -8,6 +8,7 @@ Run with:
 """
 from __future__ import annotations
 
+import time
 import streamlit as st
 
 st.set_page_config(
@@ -29,11 +30,15 @@ if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
 from streamlit_app.styles import get_premium_css
-from streamlit_app.utils.state import init_session_state, get_state
-from streamlit_app.components.sidebar import render_sidebar
+from streamlit_app.utils.state import init_session_state, get_state, set_state
+from streamlit_app.components.sidebar import render_sidebar, initialize_sidebar_state
 from streamlit_app.components.dashboard import render_spatial_analysis
 from streamlit_app.components.agents import render_agent_orchestrator
-from streamlit_app.components.chat import render_chat_interface, process_pending_response
+from streamlit_app.components.chat import (
+    render_chat_interface,
+    process_pending_response,
+    consume_pending_action_prompt,
+)
 from streamlit_app.components.settings import render_settings
 
 
@@ -44,14 +49,47 @@ PAGE_TITLES = {
     "settings": ("Settings", "Configure API credentials, pipeline parameters, and preferences."),
 }
 
+_PENDING_POLL_INTERVAL_SEC = 0.25
+
+
+def _has_pending_response() -> bool:
+    """Return True when chat has an in-flight or queued background response."""
+    return bool(
+        get_state("pending_user_input")
+        or get_state("pending_response_inflight")
+        or get_state("pending_response_job_id")
+    )
+
+
+def _has_unrendered_completion() -> bool:
+    completion_tick = int(get_state("_chat_completion_tick", 0) or 0)
+    seen_tick = int(get_state("_chat_completion_seen_tick", 0) or 0)
+    return completion_tick > seen_tick
+
+
+def _poll_pending_response() -> None:
+    """Keep UI responsive by rerunning while a background chat response is pending."""
+    if _has_unrendered_completion():
+        set_state("_chat_completion_seen_tick", int(get_state("_chat_completion_tick", 0) or 0))
+        st.rerun()
+        return
+
+    if not _has_pending_response():
+        return
+    time.sleep(_PENDING_POLL_INTERVAL_SEC)
+    st.rerun()
+
 
 def main():
     """Main application entry point."""
     init_session_state()
+    initialize_sidebar_state()
     process_pending_response()
+    consume_pending_action_prompt()
     st.markdown(get_premium_css(), unsafe_allow_html=True)
     render_sidebar()
     render_main_content()
+    _poll_pending_response()
 
 
 def render_main_content():

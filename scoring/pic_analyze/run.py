@@ -7,6 +7,48 @@ Azure GPT 图片分析对话系统启动脚本
 
 import sys
 import os
+import builtins
+
+_ORIGINAL_PRINT = builtins.print
+
+
+def _configure_stdio_for_unicode():
+    """Best-effort UTF-8 console setup for Windows and mixed terminal encodings."""
+    for stream in (sys.stdout, sys.stderr):
+        if stream is None:
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
+def _safe_print(*args, **kwargs):
+    """Print wrapper that avoids UnicodeEncodeError on legacy console encodings."""
+    try:
+        return _ORIGINAL_PRINT(*args, **kwargs)
+    except UnicodeEncodeError:
+        file_obj = kwargs.get("file", sys.stdout)
+        sep = kwargs.get("sep", " ")
+        end = kwargs.get("end", "\n")
+        flush = bool(kwargs.get("flush", False))
+        text = sep.join(str(arg) for arg in args) + end
+        encoding = getattr(file_obj, "encoding", None) or "utf-8"
+        safe_text = text.encode(encoding, errors="replace").decode(encoding, errors="replace")
+        try:
+            file_obj.write(safe_text)
+            if flush and hasattr(file_obj, "flush"):
+                file_obj.flush()
+        except Exception:
+            fallback = text.encode("ascii", errors="replace").decode("ascii", errors="replace")
+            return _ORIGINAL_PRINT(fallback, end="", file=file_obj, flush=flush)
+
+
+def _bootstrap_console_output():
+    _configure_stdio_for_unicode()
+    builtins.print = _safe_print
 
 def check_dependencies():
     """检查依赖包是否安装"""
@@ -62,6 +104,7 @@ def check_config():
 
 def main():
     """主函数"""
+    _bootstrap_console_output()
     print("🚀 启动Azure GPT图片分析对话系统...")
     print("=" * 50)
     
