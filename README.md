@@ -1,9 +1,20 @@
 # EnsAgent
 
+<a id="english"></a>
+
 <div align="center">
   <h3>Ensemble Multi-Agent Framework for Spatial Transcriptomics</h3>
   <p>
     <b>English</b> | <a href="#中文说明">中文</a>
+  </p>
+  <p>
+    <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
+    <img src="https://img.shields.io/badge/R-4.2%2B-276DC3?logo=r&logoColor=white" alt="R 4.2+">
+    <img src="https://img.shields.io/badge/TypeScript-5%2B-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5+">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
+    <img src="https://img.shields.io/badge/npm-required-CB3837?logo=npm&logoColor=white" alt="npm required">
+    <img src="https://img.shields.io/badge/Next.js-14.2.5-000000?logo=nextdotjs&logoColor=white" alt="Next.js 14.2.5">
+    <img src="https://img.shields.io/badge/FastAPI-supported-009688?logo=fastapi&logoColor=white" alt="FastAPI supported">
   </p>
   <p>
     <a href="#quick-start">Quick Start</a> ·
@@ -16,8 +27,6 @@
   <br>
   <a id="demo-video"></a>
   <video src="Readme_example/Frontend-use.mp4" controls muted width="720"></video>
-  <br>
-  <a href="https://github.com/keviccz/ensAgent/raw/main/Readme_example/Frontend-use.mp4">Watch the frontend demo video</a>
 </div>
 
 
@@ -155,6 +164,10 @@ cd frontend && npm run build
 ---
 
 ## 中文说明
+
+<p align="center">
+  <a href="#english">English</a> | <b>中文</b>
+</p>
 
 EnsAgent 是一个面向 10x Visium 空间转录组数据的集成式多智能体分析框架。它统一运行 8 种空间聚类方法，使用 LLM/VLM 智能体评估 domain 证据，构建 BEST 共识结果，并通过多智能体流程完成空间 domain 注释。
 
