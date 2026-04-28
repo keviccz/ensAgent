@@ -4,11 +4,11 @@
   <img src="Readme_example/Diagram.png" alt="EnsAgent pipeline diagram" width="900">
   <br>
   <br>
-  <video src="Readme_example/Frontend-use.mp4" controls width="900">
-    Frontend demo video: Readme_example/Frontend-use.mp4
-  </video>
+  <a href="https://github.com/keviccz/ensAgent/raw/main/Readme_example/Frontend-use.mp4">
+    <img src="example_data/spatial_clustering_result_20251201_012647.png" alt="Frontend demo video preview" width="720">
+  </a>
   <br>
-  <a href="Readme_example/Frontend-use.mp4">Watch the frontend demo video</a>
+  <a href="https://github.com/keviccz/ensAgent/raw/main/Readme_example/Frontend-use.mp4">Watch the frontend demo video</a>
 </div>
 
 EnsAgent is an ensemble multi-agent framework for spatial transcriptomics analysis on 10x Visium data. It runs eight spatial clustering methods, scores domain-level evidence with LLM/VLM agents, builds a consensus BEST result, and annotates spatial domains through a multi-agent workflow.
