@@ -1,11 +1,9 @@
 # EnsAgent
 
-<a id="english"></a>
-
 <div align="center">
   <h3>Ensemble Multi-Agent Framework for Spatial Transcriptomics</h3>
   <p>
-    <b>English</b> | <a href="#中文说明">中文</a>
+    <b>English</b> | <a href="README_CN.md">中文</a>
   </p>
   <p>
     <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
@@ -37,10 +35,11 @@ EnsAgent is an ensemble multi-agent framework for spatial transcriptomics analys
 
 ## Highlights
 
-- Eight wrapped spatial clustering methods: IRIS, BASS, DR-SC, BayesSpace, SEDR, GraphST, STAGATE, and stLearn.
-- Supported local app stack: FastAPI backend plus Next.js frontend, launched with `python start.py`.
-- Reproducible outputs for clustering labels, spatial plots, DEGs, pathway summaries, score matrices, BEST labels, and final annotations.
-- Example data under `example_data/` is included for repository demos and frontend inspection.
+- **Reliability-weighted spatial domain ensemble** across multiple ST analysis tools.
+- **Dual-stream scoring** that integrates molecular evidence, spatial morphology, and vision-language assessment.
+- **Expert–Proposer–Critic annotation** with confidence scores, ranked alternatives, and evidence-linked reasoning traces.
+- **Confidence-aware outputs** with final labels, confidence values, ranked candidate labels, expert support distributions, and evidence chains.
+- **Cross-platform applicability** across Visium, Stereo-seq, and imaging-based MERFISH spatial transcriptomics data.
 
 ## Quick Start
 
@@ -160,44 +159,3 @@ cd frontend && npm run build
 - Miniforge/Mamba or Conda
 - 16 GB RAM minimum; 32 GB recommended
 - GPU optional for SEDR, GraphST, and STAGATE
-
----
-
-## 中文说明
-
-<p align="center">
-  <a href="#english">English</a> | <b>中文</b>
-</p>
-
-EnsAgent 是一个面向 10x Visium 空间转录组数据的集成式多智能体分析框架。它统一运行 8 种空间聚类方法，使用 LLM/VLM 智能体评估 domain 证据，构建 BEST 共识结果，并通过多智能体流程完成空间 domain 注释。
-
-### 主要特点
-
-- 集成 8 种空间聚类方法：IRIS、BASS、DR-SC、BayesSpace、SEDR、GraphST、STAGATE、stLearn。
-- 当前支持的本地应用栈为 FastAPI 后端 + Next.js 前端，通过 `python start.py` 启动。
-- 输出包括聚类标签、空间图、DEG、pathway、评分矩阵、BEST 标签和最终注释。
-- `example_data/` 中包含可用于仓库展示和前端查看的示例数据。
-
-### 快速运行
-
-```bash
-mamba env create -f environment.yml
-mamba activate ensagent
-python -m pip install -r requirements.txt
-
-mamba env create -f envs/R_environment.yml
-mamba env create -f envs/PY_environment.yml
-mamba env create -f envs/PY2_environment.yml
-
-cp pipeline_config.example.yaml pipeline_config.yaml
-python start.py
-```
-
-启动后访问：
-
-- FastAPI 后端：`http://localhost:8000`
-- Next.js 前端：`http://localhost:3000`
-
-### 数据与方法
-
-方法实现与数据要求见上方英文表格。IRIS 和 BASS 需要额外的 `RData/` 输入对象，其余方法主要读取标准 10x Visium 目录。
