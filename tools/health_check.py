@@ -23,10 +23,20 @@ def _status_from_checks(checks: List[Dict[str, str]]) -> str:
     return "pass"
 
 
+def _module_available(name: str) -> bool:
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):
+        module = sys.modules.get(name)
+        return module is not None and getattr(module, "__spec__", None) is not None
+
+
 def gather_health_report() -> Dict[str, object]:
     root = _repo_root()
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
+    from ensagent_tools.config_manager import load_config as load_pipeline_config
+
     checks: List[Dict[str, str]] = []
 
     py_ok = sys.version_info >= (3, 10)
@@ -43,7 +53,9 @@ def gather_health_report() -> Dict[str, object]:
         root / "scoring" / "scoring.py",
         root / "ensemble" / "build_best.py",
         root / "annotation" / "annotation_multiagent" / "orchestrator.py",
-        root / "streamlit_app" / "main.py",
+        root / "api" / "main.py",
+        root / "frontend" / "package.json",
+        root / "start.py",
     ]
     missing = [str(p.relative_to(root)) for p in required_paths if not p.exists()]
     checks.append(
@@ -54,23 +66,45 @@ def gather_health_report() -> Dict[str, object]:
         }
     )
 
-    required_envs = [
-        "AZURE_OPENAI_KEY",
-        "AZURE_OPENAI_ENDPOINT",
-        "AZURE_OPENAI_DEPLOYMENT",
-        "AZURE_OPENAI_API_VERSION",
-    ]
-    missing_env = [k for k in required_envs if not os.getenv(k)]
+    cfg = load_pipeline_config()
+    provider = str(cfg.api_provider or "").strip().lower()
+    endpoint = str(cfg.api_endpoint or cfg.azure_endpoint or "").lower()
+    if not provider:
+        if "openai.azure.com" in endpoint or "cognitiveservices.azure.com" in endpoint or cfg.azure_endpoint:
+            provider = "azure"
+        elif cfg.api_key or cfg.api_model or endpoint:
+            provider = "generic"
+
+    missing_api: List[str] = []
+    if provider == "azure":
+        if not (cfg.api_key or cfg.azure_openai_key or os.getenv("AZURE_OPENAI_KEY")):
+            missing_api.append("api_key")
+        if not (cfg.api_endpoint or cfg.azure_endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")):
+            missing_api.append("api_endpoint")
+        if not (cfg.api_model or cfg.azure_deployment or os.getenv("AZURE_OPENAI_DEPLOYMENT")):
+            missing_api.append("api_model")
+        if not (cfg.api_version or cfg.azure_api_version or os.getenv("AZURE_OPENAI_API_VERSION")):
+            missing_api.append("api_version")
+    elif provider:
+        if not (cfg.api_key or os.getenv("ENSAGENT_API_KEY")):
+            missing_api.append("api_key")
+        if not (cfg.api_model or os.getenv("ENSAGENT_API_MODEL")):
+            missing_api.append("api_model")
+
     checks.append(
         {
-            "name": "azure_openai_env",
-            "status": "pass" if not missing_env else "warn",
-            "detail": "configured" if not missing_env else f"missing: {', '.join(missing_env)}",
+            "name": "api_runtime_config",
+            "status": "pass" if provider and not missing_api else "warn",
+            "detail": (
+                f"provider={provider} configured"
+                if provider and not missing_api
+                else ("provider not configured" if not provider else f"provider={provider}, missing: {', '.join(missing_api)}")
+            ),
         }
     )
 
-    core_modules = ["pandas", "numpy", "sklearn", "openai", "streamlit"]
-    missing_modules = [m for m in core_modules if importlib.util.find_spec(m) is None]
+    core_modules = ["pandas", "numpy", "sklearn", "openai", "fastapi", "uvicorn"]
+    missing_modules = [m for m in core_modules if not _module_available(m)]
     checks.append(
         {
             "name": "core_modules",

@@ -40,6 +40,15 @@ class AzureOpenAIClient:
     """Backward-compatible name; now uses unified multi-provider runtime."""
 
     def __init__(self):
+        provider_hint = str(getattr(Config, "API_PROVIDER", "") or "").strip().lower()
+        try:
+            if provider_hint == "azure":
+                from openai import AzureOpenAI  # type: ignore  # noqa: F401
+            else:
+                from openai import OpenAI  # type: ignore  # noqa: F401
+        except Exception as exc:
+            raise RuntimeError("openai package is required for pic_analyze.") from exc
+
         self._provider_cfg = resolve_provider_config(
             api_provider=Config.API_PROVIDER,
             api_key=Config.API_KEY,
@@ -225,4 +234,3 @@ class AzureOpenAIClient:
             return str(response.choices[0].message.content or "")
         except Exception as exc:
             raise Exception(f"Chat failed: {exc}")
-

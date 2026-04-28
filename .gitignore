@@ -2,6 +2,30 @@
 # Common + project-aware ignore rules
 
 !.env.example
+
+# Keep the lightweight example payload used by README/frontend demos.
+!example_data/
+!example_data/**
+!Readme_example/
+!Readme_example/**
+
+# Runtime environments, dependency caches, and local tool state.
+.venv/
+venv/
+env/
+ENV/
+.conda/
+.conda_pkgs/
+.mamba/
+.npm_cache/
+node_modules/
+frontend/node_modules/
+.playwright-mcp/
+.pw-browsers/
+.tmp/
+.worktrees/
+
+# Python / test / build caches.
 **/*.h5ad
 **/*.rds
 **/chroma.sqlite3
@@ -29,7 +53,7 @@
 *~
 .cache
 .chat_history/
-.conda_pkgs/
+.claude/settings.local.json
 .coverage
 .coverage.*
 .DS_Store
@@ -41,17 +65,11 @@
 .installed.cfg
 .ipynb_checkpoints/
 .mypy_cache/
-.npm_cache/
-.pw-browsers/
 .pytest_cache/
 .Python
 .ruff_cache/
-.streamlit_config.json
-.tmp/
 .tox/
-.venv/
 .vscode/
-.worktrees/
 /add_*
 /debug_*
 /diagnose_*
@@ -83,11 +101,13 @@ EnsAgent/scoring/cache/
 EnsAgent/scoring/output/
 EnsAgent/scoring/output_log/
 EnsAgent/scoring/pic_analyze/output/
-env/
-ENV/
 htmlcov/
 lib/
 lib64/
+!frontend/lib/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+analysis-page.png
 logs/
 nosetests.xml
 orchestrator_test_*/
@@ -96,6 +116,8 @@ output_log/
 package RAG test/RAG_test/
 parts/
 pipeline_config.yaml
+run_annotation_test.py
+run_scoring_test.py
 Score Rag/cache/
 Score Rag/logs/
 Score Rag/output/
@@ -106,6 +128,7 @@ scoring/input/
 scoring/output/
 scoring/pic_analyze/output/
 scoring/pic_analyze/uploads/
+tools/kill_port.py
 sdist/
 site/
 Thumbs.db
@@ -113,6 +136,11 @@ Tool-runner/.git_toolrunner_backup/
 Tool-runner/151507/
 var/
 vector_db/
-venv/
 wheels/
 worktrees/
+
+# Re-include intentionally published example data after broad data/image ignores.
+!example_data/
+!example_data/**
+!Readme_example/
+!Readme_example/**

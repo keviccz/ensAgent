@@ -5,6 +5,7 @@ Tool: run the Scoring pipeline (Stage B).
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +17,19 @@ from ensagent_tools.subprocess_stream import (
     ProgressCallback,
     run_subprocess_streaming,
 )
+
+
+def _normalize_pic_sample_slug(sample_id: str | None) -> str:
+    value = str(sample_id or "").strip()
+    if not value:
+        return ""
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("._")
+
+
+def _pic_scores_file(pic_dir: Path, sample_id: str | None) -> Path:
+    slug = _normalize_pic_sample_slug(sample_id)
+    filename = "all_domains_scores.json" if not slug else f"all_domains_scores_{slug}.json"
+    return pic_dir / "output" / filename
 
 
 def _emit_progress(progress_callback: ProgressCallback | None, payload: Dict[str, Any]) -> None:
@@ -75,13 +89,15 @@ def run_scoring(
         return {"ok": False, "error": f"Not found: {script}"}
 
     effective_input_dir = input_dir or str(cfg.resolved_scoring_input_dir())
+    effective_output_dir = output_dir or str(cfg.resolved_scoring_output_dir())
     subprocess_env = dict(os.environ)
     subprocess_env.setdefault("PYTHONIOENCODING", "utf-8")
     subprocess_env.setdefault("PYTHONUTF8", "1")
     cmd = [sys.executable, str(script)]
     cmd += ["--input_dir", str(effective_input_dir)]
-    if output_dir:
-        cmd += ["--output_dir", str(output_dir)]
+    cmd += ["--output_dir", str(effective_output_dir)]
+    if cfg.sample_id:
+        cmd += ["--sample_id", str(cfg.sample_id)]
     if cfg.api_provider:
         cmd += ["--api_provider", str(cfg.api_provider)]
     if cfg.api_key:
@@ -111,11 +127,12 @@ def run_scoring(
     effective_top_degs = cfg.top_degs if top_degs is None else int(top_degs)
     cmd += ["--top_n_deg", str(effective_top_degs)]
 
-    pic_scores_file = script.parent / "pic_analyze" / "output" / "all_domains_scores.json"
+    pic_dir = script.parent / "pic_analyze"
+    pic_scores_file = _pic_scores_file(pic_dir, cfg.sample_id)
     pic_analyze_autorun = False
     pic_analyze_result: Dict[str, Any] | None = None
     if (not effective_vlm_off) and (not pic_scores_file.exists()):
-        pic_script = script.parent / "pic_analyze" / "run.py"
+        pic_script = pic_dir / "run.py"
         if not pic_script.exists():
             return {
                 "ok": False,
@@ -140,6 +157,8 @@ def run_scoring(
             },
         )
         pic_cmd = [sys.executable, str(pic_script)]
+        if cfg.sample_id:
+            pic_cmd += ["--sample_id", str(cfg.sample_id)]
         pic_analyze_result = _run_command(
             cmd=pic_cmd,
             cwd=pic_script.parent,
@@ -191,6 +210,7 @@ def run_scoring(
         "exit_code": exit_code,
         "interrupted": interrupted,
         "input_dir_used": str(effective_input_dir),
+        "output_dir_used": str(effective_output_dir),
         "temperature_used": float(effective_temperature),
         "top_p_used": float(effective_top_p),
         "vlm_off_used": bool(effective_vlm_off),

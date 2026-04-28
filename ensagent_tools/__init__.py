@@ -7,7 +7,7 @@ function **and** as an OpenAI-compatible function-calling JSON schema.
 
 Consumers:
   - ``ensagent_agent/chat.py``  (CLI LLM agent)
-  - ``streamlit_app/``          (web UI)
+  - ``api/`` + ``frontend/``    (web app)
   - ``endtoend.py``             (CLI pipeline runner)
 """
 

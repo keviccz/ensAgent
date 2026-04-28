@@ -30,8 +30,9 @@ scanpy
 anndata
 gseapy
 
-# UI
-streamlit>=1.32.0
+# Web app / API
+fastapi
+uvicorn
 plotly>=5.18.0
 
 # pic_analyze web/runtime deps

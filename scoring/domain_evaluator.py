@@ -109,7 +109,7 @@ class DomainEvaluator:
             self.pathway_data = None
             self.pathway_scores = None
 
-    def load_visual_scores(self, pic_analyze_dir: str = "pic_analyze") -> bool:
+    def load_visual_scores(self, pic_analyze_dir: str = "pic_analyze", sample_id: str = "") -> bool:
         """
         加载视觉评分数据
         
@@ -120,7 +120,7 @@ class DomainEvaluator:
             bool: 是否成功加载
         """
         try:
-            self.visual_integrator = VisualScoreIntegrator(pic_analyze_dir)
+            self.visual_integrator = VisualScoreIntegrator(pic_analyze_dir, sample_id=sample_id)
             success = self.visual_integrator.load_visual_scores()
             
             if success:

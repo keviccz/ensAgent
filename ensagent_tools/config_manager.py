@@ -6,7 +6,6 @@ The canonical config file is ``<repo_root>/pipeline_config.yaml``.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -63,13 +62,24 @@ class PipelineConfig:
         "R": "R", "PY": "PY", "PY2": "PY2",
     })
 
-    # Generic API settings (used by Streamlit Settings)
+    # Annotation expert weights & settings
+    annotation_w_marker: float = 0.30
+    annotation_w_pathway: float = 0.20
+    annotation_w_spatial: float = 0.30
+    annotation_w_vlm: float = 0.20
+    annotation_max_rounds: int = 3
+    annotation_standard_score: float = 0.65
+    annotation_vlm_required: bool = True
+    annotation_vlm_min_score: float = 0.30
+
+    # Generic API settings (used by Settings page and runtime wrappers)
     api_provider: str = ""
     api_key: str = ""
     api_endpoint: str = ""
     api_version: str = ""
     api_model: str = ""
     api_deployment: str = ""
+    visual_factor: float = 0.5
 
     # Azure OpenAI (optional; prefer env vars)
     azure_openai_key: str = ""
@@ -96,6 +106,17 @@ class PipelineConfig:
         if self.csv_path:
             return Path(self.csv_path)
         return _REPO_ROOT / "scoring" / "input"
+
+    def resolved_scoring_output_dir(self) -> Path:
+        if self.sample_id:
+            return _REPO_ROOT / "scoring" / "output" / self.sample_id
+        return _REPO_ROOT / "scoring" / "output"
+
+    def resolved_scoring_consensus_dir(self) -> Path:
+        return self.resolved_scoring_output_dir() / "consensus"
+
+    def resolved_annotation_output_dir(self) -> Path:
+        return self.resolved_best_output_dir() / "annotation_output"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

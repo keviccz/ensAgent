@@ -23,6 +23,10 @@ from typing import List, Dict
 from sklearn.preprocessing import MinMaxScaler
 from decimal import Decimal, getcontext
 from pathlib import Path
+try:
+    from visual_score_paths import visual_scores_path
+except Exception:
+    from scoring.visual_score_paths import visual_scores_path  # type: ignore
 
 # 安全地导入配置，兼容有无config.py文件的情况
 from config_loader import get_legacy_config
@@ -104,6 +108,7 @@ parser.add_argument('--output_dir', type=str, default=None, help='输出目录�
 parser.add_argument('--toolrunner_output_dir', type=str, default=None, help='Tool-runner 输出目录（包含 spot/ DEGs/ PATHWAY/ 子目录）。提供后将自动 stage 到 scoring input/')
 parser.add_argument('--toolrunner_sample_id', type=str, default=None, help='用于从 Tool-runner 输出中过滤文件的 sample_id（例如 "DLPFC_151507"）。与 --toolrunner_output_dir 一起使用')
 parser.add_argument('--toolrunner_overwrite', action='store_true', help='stage Tool-runner 输出时覆盖 scoring input/ 中已存在的文件')
+parser.add_argument('--sample_id', type=str, default=None, help='当前组织样本ID，用于选择 sample-aware 的视觉评分缓存')
 
 # Annotation 功能参数
 parser.add_argument('--annotation_multiagent', action='store_true', help='是否运行 Multi-Agent Domain Annotation 模式（含VLM/Peer/Critic/Loop/日志）')
@@ -404,7 +409,7 @@ if args.annotation_multiagent:
         )
 
         # Determine sample_id + data_dir (generalized; keeps legacy fallbacks).
-        sample_id = args.annotation_sample_id or args.toolrunner_sample_id
+        annotation_sample_id = args.sample_id or args.annotation_sample_id or args.toolrunner_sample_id
         data_dir = args.annotation_data_dir
         potential_dirs = []
         if data_dir:
@@ -428,7 +433,7 @@ if args.annotation_multiagent:
             ]
             return any(os.path.exists(p) for p in candidates)
 
-        if not sample_id:
+        if not annotation_sample_id:
             # try infer from files in potential dirs (BEST_*_spot.csv)
             for d in potential_dirs:
                 if not os.path.exists(d):
@@ -437,16 +442,16 @@ if args.annotation_multiagent:
                     for fn in os.listdir(d):
                         if fn.startswith("BEST_") and fn.endswith("_spot.csv"):
                             # BEST_<sample_id>_spot.csv
-                            sample_id = fn[len("BEST_") : -len("_spot.csv")]
+                            annotation_sample_id = fn[len("BEST_") : -len("_spot.csv")]
                             break
                 except Exception:
                     continue
-                if sample_id:
+                if annotation_sample_id:
                     break
 
         picked = None
         for d in potential_dirs:
-            if os.path.exists(d) and sample_id and _exists_best_bundle(d, sample_id):
+            if os.path.exists(d) and annotation_sample_id and _exists_best_bundle(d, annotation_sample_id):
                 picked = d
                 break
         if not picked:
@@ -463,7 +468,7 @@ if args.annotation_multiagent:
         annot_out_dir = os.path.join(output_base, "annotation_output")
         run_annotation_multiagent(
             data_dir=data_dir,
-            sample_id=str(sample_id),
+            sample_id=str(annotation_sample_id),
             target_domains=target_domains,
             output_dir=annot_out_dir,
             config=cfg,
@@ -552,9 +557,10 @@ if args.vlm_off:
     evaluator.use_visual_integration = False
     print(f"[Info] 已按 --vlm_off 关闭视觉评分整合，使用传统评分方式")
 else:
+    visual_sample_id = str(args.sample_id or args.annotation_sample_id or args.toolrunner_sample_id or "").strip()
     script_dir = Path(__file__).resolve().parent
     pic_analyze_dir = script_dir / "pic_analyze"
-    visual_scores_file = pic_analyze_dir / "output" / "all_domains_scores.json"
+    visual_scores_file = visual_scores_path(pic_analyze_dir, visual_sample_id)
     if not visual_scores_file.exists():
         pic_script = pic_analyze_dir / "run.py"
         if not pic_script.exists():
@@ -565,8 +571,11 @@ else:
         print(f"[Info] 视觉评分文件缺失，先运行 pic_analyze: {pic_script}")
         log(f"视觉评分文件缺失，先运行 pic_analyze: {pic_script}")
         try:
+            pic_cmd = [sys.executable, str(pic_script)]
+            if visual_sample_id:
+                pic_cmd.extend(["--sample_id", visual_sample_id])
             pic_proc = subprocess.run(
-                [sys.executable, str(pic_script)],
+                pic_cmd,
                 cwd=str(pic_analyze_dir),
                 check=False,
             )
@@ -586,7 +595,7 @@ else:
             exit(1)
 
     print(f"[Info] 尝试加载视觉评分数据...")
-    visual_loaded = evaluator.load_visual_scores(str(pic_analyze_dir))
+    visual_loaded = evaluator.load_visual_scores(str(pic_analyze_dir), sample_id=visual_sample_id)
     if visual_loaded:
         print(f"[Info] 视觉评分整合已启用，将影响最终评分")
     else:

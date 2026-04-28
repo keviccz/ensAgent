@@ -82,8 +82,14 @@ def run_best_builder(
 
     sid = sample_id or cfg.sample_id
     od = output_dir or str(cfg.resolved_best_output_dir())
-    sm = scores_matrix or str(repo / "scoring" / "output" / "consensus" / "scores_matrix.csv")
-    lm = labels_matrix or str(repo / "scoring" / "output" / "consensus" / "labels_matrix.csv")
+    if hasattr(cfg, "resolved_scoring_consensus_dir"):
+        consensus_dir = cfg.resolved_scoring_consensus_dir()
+    else:
+        legacy_consensus_dir = repo / "scoring" / "output" / "consensus"
+        sample_consensus_dir = repo / "scoring" / "output" / sid / "consensus"
+        consensus_dir = sample_consensus_dir if sample_consensus_dir.exists() else legacy_consensus_dir
+    sm = scores_matrix or str(consensus_dir / "scores_matrix.csv")
+    lm = labels_matrix or str(consensus_dir / "labels_matrix.csv")
     vd = visium_dir or cfg.data_path
     tf = truth_file or cfg.best_truth_file
     sk = smooth_knn if smooth_knn is not None else cfg.best_smooth_knn

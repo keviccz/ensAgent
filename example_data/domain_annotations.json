@@ -1,0 +1,155 @@
+[
+  {
+    "domain_id": 1,
+    "biological_identity": "Layer 1",
+    "biological_identity_conf": 0.87,
+    "primary_cell_types": [
+      "Astrocytes",
+      "Other glia"
+    ],
+    "key_evidence": [
+      "Marker: GFAP (FC=41.3)",
+      "Marker: AQP4 (FC=18.7)",
+      "Strong downregulation of neuronal markers NEFL, MAP1B, TUBA1B, NRGN",
+      "Sparse structure with low density in intermediate region",
+      "Ribosome pathway enrichment (NES=1.84)"
+    ],
+    "reasoning": "The very high GFAP expression combined with strong downregulation of neuronal soma/cytoskeletal markers (NEFL, MAP1B, TUBA1B, NRGN) and low myelin markers indicates a superficial glia-rich zone rather than a neuron-rich granular or deep cortical layer. The spatial location as an intermediate region with low density and dispersed structure supports a superficial molecular Layer 1 identity rather than deeper layers or white matter. The absence of strong neuronal markers and myelin markers excludes Layers 2-6 and white matter. The enriched ribosome pathway is consistent with active glial metabolism in Layer 1.",
+    "meta": {
+      "final_score": 0.87,
+      "critic_score": 0.89,
+      "rounds": 1
+    }
+  },
+  {
+    "domain_id": 2,
+    "biological_identity": "Layer 2",
+    "biological_identity_conf": 0.82,
+    "primary_cell_types": [
+      "Excitatory neurons",
+      "Inhibitory neurons",
+      "Astrocytes"
+    ],
+    "key_evidence": [
+      "Marker: CAMK2N1 (FC=11.38)",
+      "Marker: ENC1 (FC=10.98)",
+      "Marker: CUX2 (FC=8.21)",
+      "Calcium signaling pathway (NES=2.01)",
+      "Long-term potentiation pathway enriched"
+    ],
+    "reasoning": "The strong upregulation of neuronal markers CAMK2N1 and ENC1 indicates a neuron-rich cortical gray matter region. The low expression of myelin/oligodendrocyte markers MBP and PLP1 excludes white matter. The absence of very high TMSB10 excludes the deepest corticothalamic layers. The enriched calcium signaling and long-term potentiation pathways support active neuronal populations typical of upper cortical layers. Spatially, the domain is located in an intermediate region with low density/dispersed structure, consistent with Layer 2 rather than superficial Layer 1 (which would show high GFAP and low neuronal markers) or deeper layers (which would have higher TMSB10 or myelin markers). The lack of thalamocortical input pathway enrichment and strong CAMK2N1/ENC1 expression favors Layer 2 over Layer 4 (granular). Thus, the best fit is Layer 2.",
+    "meta": {
+      "final_score": 0.82,
+      "critic_score": 0.84,
+      "rounds": 1
+    }
+  },
+  {
+    "domain_id": 3,
+    "biological_identity": "Layer 3",
+    "biological_identity_conf": 0.85,
+    "primary_cell_types": [
+      "Excitatory neurons",
+      "Neurons"
+    ],
+    "key_evidence": [
+      "Marker: NRGN (FC=13.5)",
+      "Marker: ENC1 (FC=9.87)",
+      "Marker: MT-CO2 (FC=50.08)",
+      "Strong downregulation of PLP1 (FC=-12.02) and GFAP",
+      "Oxidative phosphorylation pathway enriched (NES=2.14)"
+    ],
+    "reasoning": "The domain shows strong excitatory neuronal markers (NRGN, ENC1) with very low glial markers (GFAP strongly down, PLP1 strongly down), indicating a neuron-rich cortical gray matter region rather than white matter or glia-rich superficial zone. The absence of very high TMSB10 and lack of thalamocortical input pathway enrichment argue against deepest corticothalamic or intermediate granular bands. Spatially, the domain is located centrally/deep but with low density and dispersed structure, consistent with a broad deep excitatory gray band rather than dense granular or superficial layers. The strong mitochondrial gene MT-CO2 supports high neuronal metabolic activity. Thus, Layer 3 is the best fitting label.",
+    "meta": {
+      "final_score": 0.85,
+      "critic_score": 0.86,
+      "rounds": 2
+    }
+  },
+  {
+    "domain_id": 4,
+    "biological_identity": "Layer 4",
+    "biological_identity_conf": 0.79,
+    "primary_cell_types": [
+      "Excitatory neurons",
+      "Neurons"
+    ],
+    "key_evidence": [
+      "Marker: NEFL (FC=5.86)",
+      "Marker: TUBA1B (FC=9.6)",
+      "Marker: RORB (FC=6.43)",
+      "Strong downregulation of GFAP (FC=-13.19) and CST3 (FC=-18.56)",
+      "Parkinson disease and Oxidative phosphorylation pathways enriched"
+    ],
+    "reasoning": "The domain shows strong neuronal cytoskeletal markers NEFL and TUBA1B among the top DEGs, indicating a neuron-rich cortical gray matter region. Glial markers such as GFAP and CST3 are strongly downregulated, and myelin markers (MBP/PLP1) are low, excluding white matter or glia-rich superficial zones. The enriched pathways related to neuronal metabolic activity support a high neuronal activity typical of an intermediate granular cortical band. Spatially, the domain is consistent with Layer 4, which is known as the granular input layer receiving thalamocortical inputs. The strong NEFL/TUBA1B pattern with low glial and myelin markers and pathway enrichment supports classification as Layer 4.",
+    "meta": {
+      "final_score": 0.79,
+      "critic_score": 0.80,
+      "rounds": 2
+    }
+  },
+  {
+    "domain_id": 5,
+    "biological_identity": "Layer 5",
+    "biological_identity_conf": 0.81,
+    "primary_cell_types": [
+      "Neurons (deep corticothalamic)",
+      "Oligodendrocytes"
+    ],
+    "key_evidence": [
+      "Marker: TMSB10 (FC=22.04)",
+      "Marker: MBP (FC=7.63)",
+      "Marker: BCAS1 (FC=5.91)",
+      "Synaptic vesicle cycle pathway (NES=2.05)",
+      "Moderate myelin markers without white matter-level expression"
+    ],
+    "reasoning": "The very high TMSB10 expression strongly indicates deep corticothalamic neuron populations typical of Layer 5. MBP is moderately elevated, reflecting some oligodendrocyte/myelin presence but not dominant enough to classify as white matter. Neuronal markers NEFL/NEFM are not highlighted but TMSB10 presence and synaptic vesicle cycle enrichment support a neuron-rich deep cortical band. The spatial location aligns with Layer 5 rather than superficial layers or white matter. GFAP is not elevated, excluding superficial glia-rich Layer 1. Thus, Layer 5 is the best fit.",
+    "meta": {
+      "final_score": 0.81,
+      "critic_score": 0.83,
+      "rounds": 1
+    }
+  },
+  {
+    "domain_id": 6,
+    "biological_identity": "Layer 6/White Matter",
+    "biological_identity_conf": 0.93,
+    "primary_cell_types": [
+      "Oligodendrocytes"
+    ],
+    "key_evidence": [
+      "Marker: MBP (FC=68.29)",
+      "Marker: PLP1 (FC=40.1)",
+      "Marker: MAG (FC=32.56)",
+      "Low neuronal markers (NEFL/NEFM not upregulated)",
+      "Myelination GO term strongly enriched (NES=2.41)"
+    ],
+    "reasoning": "The domain shows very high expression of oligodendrocyte markers MBP and PLP1, indicating strong myelination typical of white matter. Neuronal markers such as NEFL and NEFM are not upregulated, and deep-layer neuronal markers like TMSB10 are absent. The spatial location is consistent with white matter rather than dense cortical gray matter. The absence of strong neuronal cytoskeletal markers and the dominance of oligodendrocyte markers exclude intermediate or superficial cortical layers.",
+    "meta": {
+      "final_score": 0.93,
+      "critic_score": 0.94,
+      "rounds": 1
+    }
+  },
+  {
+    "domain_id": 7,
+    "biological_identity": "White Matter",
+    "biological_identity_conf": 0.96,
+    "primary_cell_types": [
+      "Oligodendrocytes"
+    ],
+    "key_evidence": [
+      "Marker: MBP (FC=179.8)",
+      "Marker: PLP1 (FC=106.87)",
+      "Marker: MOBP (FC=19.06)",
+      "Marker: CNP (FC=14.33)",
+      "No neuronal or astrocyte marker upregulation"
+    ],
+    "reasoning": "The extremely high fold changes of oligodendrocyte marker genes MBP, PLP1, and MOBP indicate a strong oligodendrocyte/myelin signature typical of white matter. Neuronal markers such as NEFL and NEFM are not elevated, and deep-layer neuronal markers like TMSB10 are absent. The spatial location at the peripheral/edge supports a white matter region adjacent to cortex rather than a neuron-rich cortical layer. Alternative cortical layer identities were rejected due to the dominance of oligodendrocyte markers and lack of neuronal soma markers.",
+    "meta": {
+      "final_score": 0.96,
+      "critic_score": 0.97,
+      "rounds": 1
+    }
+  }
+]

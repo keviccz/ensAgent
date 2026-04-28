@@ -87,45 +87,82 @@ def _resolve_azure_openai_settings(
 ) -> Dict[str, Any]:
     env_map = dict(os.environ) if env is None else dict(env)
     raw = _load_pipeline_config() if pipeline_raw is None else dict(pipeline_raw)
+    provider_hint = _first_non_empty(
+        env_map.get("ENSAGENT_API_PROVIDER", ""),
+        str(raw.get("api_provider") or ""),
+    )
+    endpoint_hint = _first_non_empty(
+        env_map.get("ENSAGENT_API_ENDPOINT", ""),
+        env_map.get("AZURE_OPENAI_ENDPOINT", ""),
+        env_map.get("AZURE_ENDPOINT", ""),
+        str(raw.get("api_endpoint") or ""),
+        str(raw.get("azure_endpoint") or ""),
+    )
+    inferred_provider = _normalize_provider(provider_hint) or _detect_provider_from_endpoint(endpoint_hint)
+    azure_mode = inferred_provider == "azure"
 
     resolved = resolve_provider_config(
-        api_provider=str(raw.get("api_provider") or env_map.get("ENSAGENT_API_PROVIDER", "")),
+        api_provider=_first_non_empty(
+            env_map.get("ENSAGENT_API_PROVIDER", ""),
+            str(raw.get("api_provider") or ""),
+        ),
         api_key=_first_non_empty(
             env_map.get("ENSAGENT_API_KEY", ""),
+            env_map.get("AZURE_OPENAI_API_KEY", "") if azure_mode else "",
+            env_map.get("AZURE_OPENAI_KEY", "") if azure_mode else "",
             str(raw.get("api_key") or ""),
+            str(raw.get("azure_openai_key") or "") if azure_mode else "",
         ),
         api_endpoint=_first_non_empty(
             env_map.get("ENSAGENT_API_ENDPOINT", ""),
+            env_map.get("AZURE_OPENAI_ENDPOINT", "") if azure_mode else "",
+            env_map.get("AZURE_ENDPOINT", "") if azure_mode else "",
             str(raw.get("api_endpoint") or ""),
+            str(raw.get("azure_endpoint") or "") if azure_mode else "",
         ),
         api_version=_first_non_empty(
             env_map.get("ENSAGENT_API_VERSION", ""),
+            env_map.get("AZURE_OPENAI_API_VERSION", "") if azure_mode else "",
+            env_map.get("AZURE_API_VERSION", "") if azure_mode else "",
             str(raw.get("api_version") or ""),
+            str(raw.get("azure_api_version") or "") if azure_mode else "",
         ),
         api_model=_first_non_empty(
             env_map.get("ENSAGENT_API_MODEL", ""),
+            env_map.get("AZURE_OPENAI_DEPLOYMENT_NAME", "") if azure_mode else "",
+            env_map.get("AZURE_OPENAI_DEPLOYMENT", "") if azure_mode else "",
+            env_map.get("AZURE_DEPLOYMENT", "") if azure_mode else "",
             str(raw.get("api_model") or raw.get("api_deployment") or ""),
+            str(raw.get("azure_deployment") or "") if azure_mode else "",
         ),
         azure_openai_key=_first_non_empty(
             env_map.get("AZURE_OPENAI_API_KEY", ""),
             env_map.get("AZURE_OPENAI_KEY", ""),
+            env_map.get("ENSAGENT_API_KEY", "") if azure_mode else "",
             str(raw.get("azure_openai_key") or ""),
+            str(raw.get("api_key") or "") if azure_mode else "",
         ),
         azure_endpoint=_first_non_empty(
             env_map.get("AZURE_OPENAI_ENDPOINT", ""),
             env_map.get("AZURE_ENDPOINT", ""),
+            env_map.get("ENSAGENT_API_ENDPOINT", "") if azure_mode else "",
             str(raw.get("azure_endpoint") or ""),
+            str(raw.get("api_endpoint") or "") if azure_mode else "",
         ),
         azure_api_version=_first_non_empty(
             env_map.get("AZURE_OPENAI_API_VERSION", ""),
             env_map.get("AZURE_API_VERSION", ""),
+            env_map.get("ENSAGENT_API_VERSION", "") if azure_mode else "",
             str(raw.get("azure_api_version") or ""),
+            str(raw.get("api_version") or "") if azure_mode else "",
         ),
         azure_deployment=_first_non_empty(
             env_map.get("AZURE_OPENAI_DEPLOYMENT_NAME", ""),
             env_map.get("AZURE_OPENAI_DEPLOYMENT", ""),
             env_map.get("AZURE_DEPLOYMENT", ""),
+            env_map.get("ENSAGENT_API_MODEL", "") if azure_mode else "",
             str(raw.get("azure_deployment") or ""),
+            str(raw.get("api_model") or raw.get("api_deployment") or "") if azure_mode else "",
         ),
         env=env_map,
     )

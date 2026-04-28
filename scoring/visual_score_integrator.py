@@ -12,11 +12,13 @@ import numpy as np
 from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
 
+from visual_score_paths import visual_scores_path
+
 
 class VisualScoreIntegrator:
     """视觉评分整合器，负责加载和处理pic_analyze的视觉评分数据"""
     
-    def __init__(self, pic_analyze_dir: str = "pic_analyze"):
+    def __init__(self, pic_analyze_dir: str = "pic_analyze", sample_id: str = ""):
         """
         初始化视觉评分整合器
         
@@ -24,6 +26,7 @@ class VisualScoreIntegrator:
             pic_analyze_dir: pic_analyze组件的目录路径
         """
         self.pic_analyze_dir = Path(pic_analyze_dir)
+        self.sample_id = str(sample_id or "").strip()
         self.visual_scores = None
         self.integration_config = {
             'visual_weight': 0.35,  # 视觉评分在最终评分中的权重 (中等权重确保视觉分析影响)
@@ -40,7 +43,7 @@ class VisualScoreIntegrator:
             bool: 是否成功加载
         """
         try:
-            scores_file = self.pic_analyze_dir / "output" / "all_domains_scores.json"
+            scores_file = visual_scores_path(self.pic_analyze_dir, self.sample_id)
             
             if not scores_file.exists():
                 print(f"⚠️ 视觉评分文件不存在: {scores_file}")

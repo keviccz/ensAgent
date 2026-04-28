@@ -78,14 +78,15 @@ class ScoringToolFlagTests(unittest.TestCase):
         self.assertEqual(str(cmd[input_idx + 1]).replace("\\", "/"), "custom/input")
 
     def test_run_scoring_autoruns_pic_analyze_when_visual_file_missing(self) -> None:
-        cfg = PipelineConfig(vlm_off=False)
+        cfg = PipelineConfig(vlm_off=False, sample_id="DLPFC_151669")
         state = {"visual_ready": False}
         seen_envs = []
+        seen_cmds = []
 
         repo = cfg.repo_root()
         scoring_script = repo / "scoring" / "scoring.py"
         pic_script = repo / "scoring" / "pic_analyze" / "run.py"
-        visual_file = repo / "scoring" / "pic_analyze" / "output" / "all_domains_scores.json"
+        visual_file = repo / "scoring" / "pic_analyze" / "output" / "all_domains_scores_DLPFC_151669.json"
 
         def _exists(path_obj):
             p = str(path_obj).replace("\\", "/")
@@ -97,8 +98,9 @@ class ScoringToolFlagTests(unittest.TestCase):
                 return bool(state["visual_ready"])
             return True
 
-        def _run_command(*, stage, env=None, **_kwargs):
+        def _run_command(*, stage, env=None, cmd=None, **_kwargs):
             seen_envs.append(dict(env or {}))
+            seen_cmds.append(list(cmd or []))
             if stage == "scoring_visual":
                 state["visual_ready"] = True
             return {"returncode": 0, "interrupted": False, "stdout_tail": [], "log_line_count": 0}
@@ -111,18 +113,22 @@ class ScoringToolFlagTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertTrue(result["pic_analyze_autorun"])
         self.assertEqual(result["pic_analyze_exit_code"], 0)
+        self.assertTrue(str(result["visual_scores_file"]).endswith("all_domains_scores_DLPFC_151669.json"))
         self.assertGreaterEqual(len(seen_envs), 2)
         for env in seen_envs:
             self.assertEqual(env.get("PYTHONIOENCODING"), "utf-8")
             self.assertEqual(env.get("PYTHONUTF8"), "1")
+        visual_cmd = next(cmd for cmd in seen_cmds if any(str(part).endswith("run.py") for part in cmd))
+        self.assertIn("--sample_id", visual_cmd)
+        self.assertIn("DLPFC_151669", visual_cmd)
 
     def test_run_scoring_fails_when_pic_analyze_prestep_fails(self) -> None:
-        cfg = PipelineConfig(vlm_off=False)
+        cfg = PipelineConfig(vlm_off=False, sample_id="DLPFC_151669")
 
         repo = cfg.repo_root()
         scoring_script = repo / "scoring" / "scoring.py"
         pic_script = repo / "scoring" / "pic_analyze" / "run.py"
-        visual_file = repo / "scoring" / "pic_analyze" / "output" / "all_domains_scores.json"
+        visual_file = repo / "scoring" / "pic_analyze" / "output" / "all_domains_scores_DLPFC_151669.json"
 
         def _exists(path_obj):
             p = str(path_obj).replace("\\", "/")

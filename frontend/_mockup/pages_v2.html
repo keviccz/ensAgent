@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnsAgent — Interactive Preview v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-sidebar:    #F7F7F7;
+  --bg-main:       #FFFFFF;
+  --bg-surface:    #F3F4F6;
+  --bg-hover:      #EBEBEB;
+  --border:        rgba(0,0,0,0.08);
+  --border-soft:   rgba(0,0,0,0.05);
+  --dark-gray:     #2F2F2F;
+  --mid-gray:      #CCCCCC;
+  --data:          #0EA5E9;
+  --data-soft:     rgba(14,165,233,0.10);
+  --success:       #10B981;
+  --warning:       #F59E0B;
+  --error:         #EF4444;
+  --idle:          #9CA3AF;
+  --text-primary:  #0A0A0A;
+  --text-secondary:#4B5563;
+  --text-muted:    #9CA3AF;
+  --font-ui:       'Sora', sans-serif;
+  --font-mono:     'JetBrains Mono', monospace;
+}
+body { font-family: var(--font-ui); background: #E0E0E0; color: var(--text-primary); font-size: 14px; height: 100vh; display: flex; flex-direction: column; }
+
+/* ── APP SHELL ── */
+.app-shell { display: flex; flex: 1; height: 100vh; overflow: hidden; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 230px; flex-shrink: 0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  position: relative; overflow: hidden;
+}
+.sidebar::before {
+  content: ''; position: absolute; inset: 0;
+  background-image: radial-gradient(circle, rgba(0,0,0,0.035) 1px, transparent 1px);
+  background-size: 20px 20px; pointer-events: none;
+}
+.sidebar-brand { padding: 20px 16px 14px; border-bottom: 1px solid var(--border-soft); position: relative; }
+.brand-name { font-size: 15px; font-weight: 700; letter-spacing: -0.03em; }
+.brand-sub { font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; margin-top: 1px; }
+.nav { padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; position: relative; }
+.nav-label { font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); padding: 8px 8px 4px; }
+.nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; border-radius: 7px; cursor: pointer;
+  color: var(--text-secondary); font-size: 13px; transition: all 0.15s;
+  user-select: none;
+}
+.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-item.active { background: var(--mid-gray); color: var(--text-primary); font-weight: 500; }
+.nav-icon { width: 15px; height: 15px; flex-shrink: 0; opacity: 0.55; }
+.nav-item.active .nav-icon { opacity: 1; }
+.sidebar-div { height: 1px; background: var(--border-soft); margin: 4px 16px; }
+.conv-section { flex: 1; overflow-y: auto; padding: 8px 8px 16px; position: relative; }
+.new-chat-btn { width: 100%; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-main); color: var(--text-secondary); font-size: 12.5px; cursor: pointer; margin-bottom: 8px; font-family: var(--font-ui); text-align: left; transition: all 0.12s; }
+.new-chat-btn:hover { border-color: var(--dark-gray); color: var(--dark-gray); }
+.conv-label { font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); padding: 4px 8px; }
+.conv-item { padding: 6px 10px; border-radius: 6px; color: var(--text-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.conv-item:hover { background: var(--bg-hover); color: var(--text-secondary); }
+.conv-item.active-conv { background: var(--bg-main); color: var(--text-primary); border: 1px solid var(--border); }
+
+/* ── MAIN ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-main); }
+.topbar { height: 48px; display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border); gap: 10px; flex-shrink: 0; }
+.page-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.topbar-dot { width: 4px; height: 4px; background: var(--data); border-radius: 50%; }
+.page-sub { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+
+/* ── PAGES ── */
+.page { display: none; flex: 1; overflow-y: auto; }
+.page.active { display: flex; flex-direction: column; }
+#page-analysis.active, #page-agents.active, #page-settings.active { display: block; overflow-y: auto; }
+#page-chat { flex-direction: column; height: 100%; overflow: hidden; }
+
+/* ─── ANALYSIS ─── */
+.analysis-content { padding: 20px 24px; }
+.kpi-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+.kpi-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.kpi-label { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.kpi-value { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+.section-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.section-badge { font-family: var(--font-mono); font-size: 9px; background: var(--data-soft); color: var(--data); padding: 2px 7px; border-radius: 4px; }
+
+/* Clustering + Annotation split */
+.anno-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.anno-plot-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.anno-plot-title { padding: 10px 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary); border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; gap: 6px; }
+.anno-hint { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); }
+.scatter-area { height: 200px; position: relative; }
+.scatter-dot { position: absolute; border-radius: 50%; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
+.scatter-dot:hover { transform: scale(1.5); z-index: 10; }
+.scatter-dot.selected { transform: scale(1.8); box-shadow: 0 0 0 3px white, 0 0 0 5px currentColor; z-index: 20; }
+.cluster-legend { padding: 8px 14px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.12s; }
+.legend-item:hover { background: var(--bg-hover); }
+.legend-item.selected-legend { background: var(--bg-hover); color: var(--text-primary); font-weight: 500; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Annotation panel */
+.anno-info-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.anno-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 260px; color: var(--text-muted); gap: 8px; }
+.anno-empty-icon { font-size: 28px; opacity: 0.4; }
+.anno-empty-text { font-size: 12px; }
+.anno-detail { display: none; flex-direction: column; height: 100%; }
+.anno-detail.visible { display: flex; }
+.anno-detail-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+.anno-color-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.anno-cluster-name { font-size: 13px; font-weight: 600; }
+.anno-cluster-sub { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+.anno-detail-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.anno-field { display: flex; flex-direction: column; gap: 3px; }
+.anno-field-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-family: var(--font-mono); }
+.anno-field-value { font-size: 12.5px; color: var(--text-primary); line-height: 1.55; }
+.anno-score-row { display: flex; gap: 8px; align-items: center; }
+.anno-score-bar { flex: 1; height: 5px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
+.anno-score-fill { height: 100%; border-radius: 3px; background: var(--success); }
+.anno-score-val { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); width: 32px; text-align: right; }
+.interp-list { display: flex; flex-direction: column; gap: 4px; }
+.interp-item { font-size: 11.5px; color: var(--text-secondary); display: flex; gap: 6px; }
+.interp-bullet { color: var(--data); flex-shrink: 0; }
+.anno-api-note { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted); background: var(--bg-main); border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px; }
+
+/* expression plot */
+.plot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.plot-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.plot-title { padding: 10px 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.plot-area { height: 160px; position: relative; }
+.legend { padding: 8px 14px 10px; display: flex; flex-wrap: wrap; gap: 5px; }
+.legend-item-sm { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-muted); }
+.legend-dot-sm { width: 7px; height: 7px; border-radius: 50%; }
+
+/* ─── AGENTS ─── */
+.agents-content { padding: 20px 24px; }
+.agents-filter-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.filter-btn { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-surface); font-size: 11.5px; font-family: var(--font-ui); color: var(--text-secondary); cursor: pointer; transition: all 0.12s; }
+.filter-btn:hover { border-color: var(--data); color: var(--data); }
+.filter-btn.active-filter { background: var(--dark-gray); color: #fff; border-color: var(--dark-gray); }
+.filter-label { font-size: 11px; color: var(--text-muted); }
+
+.agent-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+.agent-card {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px; display: flex; gap: 12px; align-items: flex-start;
+  cursor: pointer; transition: all 0.15s; user-select: none;
+}
+.agent-card:hover { border-color: rgba(0,0,0,0.15); background: #EEEEF0; }
+.agent-card.selected-agent { border-color: var(--data); background: var(--data-soft); }
+.agent-card.active-card { border-color: rgba(14,165,233,0.3); background: rgba(14,165,233,0.05); }
+.agent-badge { width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-secondary); background: var(--bg-hover); border: 1px solid var(--border); }
+.agent-badge.active-badge { background: var(--data-soft); color: var(--data); border-color: rgba(14,165,233,0.2); }
+.agent-badge.done-badge { background: rgba(16,185,129,0.08); color: var(--success); border-color: rgba(16,185,129,0.2); }
+.agent-meta { flex: 1; min-width: 0; }
+.agent-name { font-size: 12.5px; font-weight: 500; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dot-idle { background: var(--idle); }
+.dot-active { background: var(--data); animation: pulse 1.5s infinite; }
+.dot-done { background: var(--success); }
+.agent-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+.agent-progress-bar { height: 3px; background: var(--bg-hover); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.agent-progress-fill { height: 100%; background: var(--data); border-radius: 2px; }
+.status-tag { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); text-transform: uppercase; padding: 2px 5px; border-radius: 3px; border: 1px solid var(--border); }
+.status-tag.active-tag { color: var(--data); border-color: rgba(14,165,233,0.3); background: var(--data-soft); }
+.status-tag.done-tag { color: var(--success); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.08); }
+.skip-btn { font-family: var(--font-mono); font-size: 9px; color: var(--warning); border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.06); border-radius: 3px; padding: 2px 6px; cursor: pointer; transition: all 0.12s; }
+.skip-btn:hover { background: rgba(245,158,11,0.12); }
+.agent-api-note { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 4px; }
+
+.log-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.log-title { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.log-filter-tag { font-family: var(--font-mono); font-size: 10px; color: var(--data); background: var(--data-soft); padding: 2px 8px; border-radius: 4px; display: none; }
+.log-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; max-height: 160px; overflow-y: auto; }
+.log-row { display: flex; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--border-soft); font-size: 11.5px; }
+.log-row:last-child { border-bottom: none; }
+.log-row.hidden-log { display: none; }
+.log-time { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); flex-shrink: 0; }
+.log-msg { color: var(--text-secondary); }
+.log-msg.success { color: var(--success); }
+.log-msg.info { color: var(--data); }
+
+/* ─── SETTINGS ─── */
+.settings-content { padding: 20px 24px; }
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.settings-section { display: flex; flex-direction: column; gap: 14px; }
+.section-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+.section-card-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.section-card-desc { font-size: 11px; color: var(--text-muted); margin-bottom: 14px; }
+.field-group { display: flex; flex-direction: column; gap: 11px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field-label { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+.field-input { padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-main); font-family: var(--font-ui); font-size: 12.5px; color: var(--text-primary); outline: none; width: 100%; transition: border-color 0.12s, box-shadow 0.12s; }
+.field-input:focus { border-color: rgba(0,0,0,0.2); box-shadow: 0 0 0 3px rgba(0,0,0,0.04); }
+.field-select { padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-main); font-family: var(--font-ui); font-size: 12.5px; color: var(--text-primary); width: 100%; }
+.field-hint { font-size: 10.5px; color: var(--text-muted); }
+.slider-row { display: flex; align-items: center; gap: 10px; }
+.slider { flex: 1; accent-color: var(--dark-gray); cursor: pointer; }
+.slider-val { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); width: 36px; text-align: right; font-weight: 500; }
+.btn-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.save-btn { padding: 9px 20px; background: var(--dark-gray); color: #fff; border: none; border-radius: 8px; font-family: var(--font-ui); font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
+.save-btn:hover { opacity: 0.8; }
+.save-btn.wide { width: 100%; text-align: center; }
+.test-btn { padding: 8px 14px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 8px; font-family: var(--font-ui); font-size: 12px; cursor: pointer; transition: all 0.12s; }
+.test-btn:hover { border-color: var(--data); color: var(--data); }
+
+/* ─── API NOTE TOOLTIP ─── */
+.api-pill { display: none; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* Domain colors */
+.d1 { background: #3B82F6; } .d2 { background: #10B981; } .d3 { background: #F59E0B; }
+.d4 { background: #EF4444; } .d5 { background: #8B5CF6; } .d6 { background: #0EA5E9; }
+.d7 { background: #F97316; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+<!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-name">EnsAgent</div>
+    <div class="brand-sub">Spatial Transcriptomics</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-label">Navigation</div>
+    <div class="nav-item" id="nav-chat" onclick="navigate('chat')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h7"/></svg>
+      Chat
+    </div>
+    <div class="nav-item active" id="nav-analysis" onclick="navigate('analysis')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="11" r="1.5"/><circle cx="9" cy="7" r="1.5"/><circle cx="13" cy="10" r="1.5"/><circle cx="3" cy="14" r="1.5"/></svg>
+      Analysis
+    </div>
+    <div class="nav-item" id="nav-agents" onclick="navigate('agents')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="5" width="4" height="4" rx="1"/><rect x="6" y="2" width="4" height="4" rx="1"/><rect x="11" y="5" width="4" height="4" rx="1"/></svg>
+      Agents
+    </div>
+    <div class="nav-item" id="nav-settings" onclick="navigate('settings')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
+      Settings
+    </div>
+  </nav>
+  <div class="sidebar-div"></div>
+  <div class="conv-section">
+    <button class="new-chat-btn" onclick="navigate('chat')">＋ New Chat</button>
+    <div class="conv-label">Recent</div>
+    <div class="conv-item active-conv">Run DLPFC_151507 full pipeline</div>
+    <div class="conv-item">Check scoring results for sample</div>
+    <div class="conv-item">Annotate domains with multi-agent</div>
+    <div class="conv-item">Configure Azure OpenAI endpoint</div>
+  </div>
+</div>
+
+<!-- ══ MAIN ════════════════════════════════════════════════ -->
+<div class="main">
+  <!-- Topbar updates by page -->
+  <div class="topbar">
+    <span class="page-title" id="topbar-title">Analysis</span>
+    <span class="topbar-dot"></span>
+    <span class="page-sub" id="topbar-sub">DLPFC_151507 · 7 domains</span>
+  </div>
+
+  <!-- ════ CHAT PAGE ════ -->
+  <div class="page" id="page-chat">
+    <div style="flex:1;overflow-y:auto;padding:36px 72px;display:flex;flex-direction:column;gap:28px;max-width:820px;margin:0 auto;width:100%;">
+      <div style="display:flex;justify-content:flex-end;">
+        <div style="background:var(--mid-gray);color:var(--text-primary);padding:12px 18px;border-radius:18px 18px 4px 18px;font-size:13.5px;max-width:580px;line-height:1.65;">
+          Run the full end-to-end pipeline on DLPFC_151507 with 7 clusters.
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-left:2px solid var(--text-muted);border-radius:0 8px 8px 0;padding:8px 12px;max-width:640px;">
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Reasoning</div>
+          <div style="font-size:12.5px;color:var(--text-secondary);line-height:1.65;">
+            <div style="display:flex;gap:8px;margin-bottom:4px;"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);padding-top:2px;width:14px;flex-shrink:0">1.</span><span>User wants to run all 4 pipeline stages (A→B→C→D) on DLPFC_151507 with 7 clusters.</span></div>
+            <div style="display:flex;gap:8px;"><span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);padding-top:2px;width:14px;flex-shrink:0">2.</span><span>I'll call <code style="font-family:var(--font-mono);font-size:11px">run_end_to_end</code> — data path already set in config.</span></div>
+          </div>
+        </div>
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-width:640px;">
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg-hover);cursor:pointer;" onclick="this.parentElement.classList.toggle('expanded')">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--data);animation:pulse 1.5s infinite;flex-shrink:0"></div>
+            <span style="font-family:var(--font-mono);font-size:12px;font-weight:500">run_end_to_end</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-left:auto">Tool Call ▾</span>
+          </div>
+          <div style="padding:8px 12px;display:flex;flex-wrap:wrap;gap:6px;">
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:1px 7px;"><span style="color:var(--data)">sample_id</span> DLPFC_151507</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:1px 7px;"><span style="color:var(--data)">n_clusters</span> 7</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);background:var(--bg-main);border:1px solid var(--border);border-radius:4px;padding:1px 7px;"><span style="color:var(--data)">methods</span> all</span>
+          </div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.75;color:var(--text-primary);max-width:640px;">
+          Starting full pipeline for <code style="font-family:var(--font-mono);font-size:12px;color:var(--data);background:var(--data-soft);padding:1px 5px;border-radius:4px">DLPFC_151507</code> with <strong>7 clusters</strong>. Launching Stage A (Tool Runner) across 8 clustering methods.
+        </div>
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;max-width:380px;">
+          <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:10px;">Pipeline progress</div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-family:var(--font-mono);font-size:11.5px;">
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:14px;color:var(--success)">✓</span><span style="width:80px;color:var(--text-secondary)">Stage A</span><div style="flex:1;height:4px;background:var(--bg-hover);border-radius:2px;overflow:hidden"><div style="width:100%;height:100%;background:var(--success);border-radius:2px"></div></div><span style="width:32px;text-align:right;color:var(--success)">100%</span></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:14px;color:var(--data)">◎</span><span style="width:80px;color:var(--text-secondary)">Stage B</span><div style="flex:1;height:4px;background:var(--bg-hover);border-radius:2px;overflow:hidden"><div style="width:62%;height:100%;background:var(--data);border-radius:2px"></div></div><span style="width:32px;text-align:right;color:var(--data)">62%</span></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:14px;color:var(--text-muted)">○</span><span style="width:80px;color:var(--text-muted)">Stage C</span><div style="flex:1;height:4px;background:var(--bg-hover);border-radius:2px"></div><span style="width:32px;text-align:right;color:var(--text-muted)">—</span></div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="width:14px;color:var(--text-muted)">○</span><span style="width:80px;color:var(--text-muted)">Stage D</span><div style="flex:1;height:4px;background:var(--bg-hover);border-radius:2px"></div><span style="width:32px;text-align:right;color:var(--text-muted)">—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:16px 72px 24px;max-width:820px;margin:0 auto;width:100%;border-top:1px solid var(--border-soft);">
+      <div style="display:flex;align-items:flex-end;gap:10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:10px 12px 10px 16px;">
+        <textarea placeholder="Message EnsAgent…" rows="1" style="flex:1;background:transparent;border:none;outline:none;font-family:var(--font-ui);font-size:13.5px;color:var(--text-primary);resize:none;min-height:22px;"></textarea>
+        <button style="width:32px;height:32px;background:var(--dark-gray);border:none;border-radius:8px;cursor:pointer;color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">↑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ ANALYSIS PAGE ════ -->
+  <div class="page active" id="page-analysis">
+    <div class="analysis-content">
+      <!-- KPI -->
+      <div class="kpi-strip">
+        <div class="kpi-card"><div class="kpi-label">Total Spots</div><div class="kpi-value">3,498</div><div class="kpi-sub">10x Visium grid</div></div>
+        <div class="kpi-card"><div class="kpi-label">Domains</div><div class="kpi-value">7</div><div class="kpi-sub">spatial clusters</div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg Expression</div><div class="kpi-value">2.14</div><div class="kpi-sub">log-normalized</div></div>
+        <div class="kpi-card"><div class="kpi-label">Coverage</div><div class="kpi-value">100%</div><div class="kpi-sub">all spots assigned</div></div>
+      </div>
+
+      <!-- Annotation section -->
+      <div class="section-title">
+        Domain Annotation
+      </div>
+      <div class="anno-split">
+        <!-- Left: scatter -->
+        <div class="anno-plot-card">
+          <div class="anno-plot-title">
+            Domain Clustering
+            <span class="anno-hint">click a domain</span>
+          </div>
+          <div class="scatter-area" id="anno-scatter"></div>
+          <div class="cluster-legend" id="cluster-legend"></div>
+        </div>
+        <!-- Right: annotation info -->
+        <div class="anno-info-card">
+          <div class="anno-empty" id="anno-empty">
+            <div class="anno-empty-icon">🔬</div>
+            <div class="anno-empty-text">Select a domain cluster to view annotation</div>
+          </div>
+          <div class="anno-detail" id="anno-detail">
+            <div class="anno-detail-header">
+              <div class="anno-color-dot" id="anno-color"></div>
+              <div>
+                <div class="anno-cluster-name" id="anno-name">—</div>
+                <div class="anno-cluster-sub" id="anno-sub">—</div>
+              </div>
+            </div>
+            <div class="anno-detail-body">
+              <div class="anno-field">
+                <div class="anno-field-label">Annotation</div>
+                <div class="anno-field-value" id="anno-annotation">—</div>
+              </div>
+              <div class="anno-field">
+                <div class="anno-field-label">Confidence Score</div>
+                <div class="anno-score-row">
+                  <div class="anno-score-bar"><div class="anno-score-fill" id="anno-score-fill" style="width:0%"></div></div>
+                  <span class="anno-score-val" id="anno-score-val">—</span>
+                </div>
+              </div>
+              <div class="anno-field">
+                <div class="anno-field-label">Marker Genes</div>
+                <div class="anno-field-value" id="anno-markers">—</div>
+              </div>
+              <div class="anno-field">
+                <div class="anno-field-label">Interpretability</div>
+                <div class="interp-list" id="anno-interp"></div>
+              </div>
+              <div class="anno-api-note" id="anno-api-note">GET /api/annotation/DLPFC_151507/0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expression plots -->
+      <div class="section-title">Spatial Expression</div>
+      <div class="plot-grid">
+        <div class="plot-card">
+          <div class="plot-title">Expression Level</div>
+          <div class="plot-area" id="expr-scatter"></div>
+          <div class="legend">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:10px;color:var(--text-muted)">Low</span>
+              <div style="width:80px;height:6px;border-radius:3px;background:linear-gradient(90deg,#E0F2FE,#0EA5E9,#0369A1)"></div>
+              <span style="font-size:10px;color:var(--text-muted)">High</span>
+            </div>
+          </div>
+        </div>
+        <div class="plot-card">
+          <div class="plot-title">Scores Matrix</div>
+          <div class="plot-area" id="score-chart"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ AGENTS PAGE ════ -->
+  <div class="page" id="page-agents">
+    <div class="agents-content">
+      <div class="agents-filter-bar">
+        <span class="filter-label">Filter log:</span>
+        <button class="filter-btn active-filter" onclick="filterAgent('all', this)">All</button>
+        <button class="filter-btn" onclick="filterAgent('DP', this)">Data Processor</button>
+        <button class="filter-btn" onclick="filterAgent('TR', this)">Tool Runner</button>
+        <button class="filter-btn" onclick="filterAgent('SA', this)">Scoring Agent</button>
+        <button class="filter-btn" onclick="filterAgent('BB', this)">BEST Builder</button>
+        <button class="filter-btn" onclick="filterAgent('AA', this)">Annotation</button>
+        <button class="filter-btn" onclick="filterAgent('CR', this)">Critic</button>
+      </div>
+
+      <div class="agent-grid">
+        <!-- DP: done -->
+        <div class="agent-card" id="card-DP" onclick="selectAgent('DP', this)">
+          <div class="agent-badge done-badge">DP</div>
+          <div class="agent-meta">
+            <div class="agent-name">
+              <span class="status-dot dot-done"></span>
+              Data Processor
+              <span class="status-tag done-tag">DONE</span>
+              <span class="skip-btn" title="Skip — output exists" onclick="event.stopPropagation();skipAgent('DP')">SKIP</span>
+            </div>
+            <div class="agent-desc">Handles data ingestion and preprocessing</div>
+          </div>
+        </div>
+        <!-- TR: active -->
+        <div class="agent-card active-card" id="card-TR" onclick="selectAgent('TR', this)">
+          <div class="agent-badge active-badge">TR</div>
+          <div class="agent-meta">
+            <div class="agent-name">
+              <span class="status-dot dot-active"></span>
+              Tool Runner
+              <span class="status-tag active-tag">ACTIVE</span>
+            </div>
+            <div class="agent-desc">Orchestrates spatial clustering — Stage A</div>
+            <div class="agent-progress-bar"><div class="agent-progress-fill" style="width:62%"></div></div>
+          </div>
+        </div>
+        <!-- SA: active -->
+        <div class="agent-card active-card" id="card-SA" onclick="selectAgent('SA', this)">
+          <div class="agent-badge active-badge">SA</div>
+          <div class="agent-meta">
+            <div class="agent-name">
+              <span class="status-dot dot-active"></span>
+              Scoring Agent
+              <span class="status-tag active-tag">ACTIVE</span>
+            </div>
+            <div class="agent-desc">Evaluates domain scores via LLM rubric</div>
+            <div class="agent-progress-bar"><div class="agent-progress-fill" style="width:28%"></div></div>
+          </div>
+        </div>
+        <!-- BB: idle, has output files -->
+        <div class="agent-card" id="card-BB" onclick="selectAgent('BB', this)">
+          <div class="agent-badge">BB</div>
+          <div class="agent-meta">
+            <div class="agent-name">
+              <span class="status-dot dot-idle"></span>
+              BEST Builder
+              <span class="status-tag">IDLE</span>
+              <span class="skip-btn" title="Skip — output exists" onclick="event.stopPropagation();skipAgent('BB')">SKIP</span>
+            </div>
+            <div class="agent-desc">Selects optimal domain labels per spot</div>
+          </div>
+        </div>
+        <!-- AA: idle -->
+        <div class="agent-card" id="card-AA" onclick="selectAgent('AA', this)">
+          <div class="agent-badge">AA</div>
+          <div class="agent-meta">
+            <div class="agent-name">
+              <span class="status-dot dot-idle"></span>
+              Annotation Agent
+              <span class="status-tag">IDLE</span>
+            </div>
+            <div class="agent-desc">Multi-agent domain annotation workflow</div>
+          </div>
+        </div>
+        <!-- CR: idle -->
+        <div class="agent-card" id="card-CR" onclick="selectAgent('CR', this)">
+          <div class="agent-badge">CR</div>
+          <div class="agent-meta">
+            <div class="agent-name">
+              <span class="status-dot dot-idle"></span>
+              Critic Agent
+              <span class="status-tag">IDLE</span>
+            </div>
+            <div class="agent-desc">Validates and refines annotations</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="log-header">
+        <span class="log-title">Activity Log</span>
+        <span class="log-filter-tag" id="log-filter-tag"></span>
+      </div>
+      <div class="log-card">
+        <div class="log-row" data-agent="TR"><span class="log-time">14:32:01</span><span class="log-msg info">Tool Runner: STAGATE completed — 3,498 spots labeled</span></div>
+        <div class="log-row" data-agent="TR"><span class="log-time">14:31:44</span><span class="log-msg info">Tool Runner: GraphST completed — writing output</span></div>
+        <div class="log-row" data-agent="SA"><span class="log-time">14:30:20</span><span class="log-msg info">Scoring Agent: evaluating Domain 3 via LLM rubric</span></div>
+        <div class="log-row" data-agent="DP"><span class="log-time">14:28:12</span><span class="log-msg success">Data Processor: preprocessing complete (n=3498 spots)</span></div>
+        <div class="log-row" data-agent="DP"><span class="log-time">14:27:58</span><span class="log-msg">Data Processor: loading h5ad file DLPFC_151507</span></div>
+        <div class="log-row" data-agent="TR"><span class="log-time">14:27:55</span><span class="log-msg">Tool Runner: pipeline started — 8 methods queued</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ SETTINGS PAGE ════ -->
+  <div class="page" id="page-settings">
+    <div class="settings-content">
+      <div class="settings-grid">
+        <div class="settings-section">
+          <!-- API Config -->
+          <div class="section-card">
+            <div class="section-card-title">API Configuration</div>
+            <div class="section-card-desc">LLM provider credentials — saved to pipeline_config.yaml</div>
+            <div class="field-group">
+              <div class="field">
+                <div class="field-label">Provider</div>
+                <select class="field-select" id="provider-select" onchange="onProviderChange(this.value)">
+                  <option>OpenAI</option><option>Azure OpenAI</option>
+                  <option selected>Anthropic</option><option>Google Gemini</option>
+                  <option>OpenRouter</option><option>DeepSeek</option>
+                  <option>Groq</option><option>Together AI</option>
+                  <option>Mistral</option><option>xAI</option>
+                </select>
+                <div class="api-pill">POST <span>/api/config/save</span> · field: api_provider</div>
+              </div>
+              <div class="field">
+                <div class="field-label">API Key</div>
+                <input class="field-input" type="password" value="sk-ant-••••••••••••••••" />
+                <div class="api-pill">saved encrypted to pipeline_config.yaml</div>
+              </div>
+              <div class="field">
+                <div class="field-label">Model</div>
+                <input class="field-input" id="model-input" value="claude-sonnet-4-6" />
+              </div>
+              <div class="field">
+                <div class="field-label">Endpoint <span style="color:var(--text-muted);font-weight:400">(optional)</span></div>
+                <input class="field-input" id="endpoint-input" placeholder="https://api.anthropic.com" />
+                <div class="field-hint">Leave blank to use provider default</div>
+              </div>
+              <div class="btn-row">
+                <button class="save-btn" onclick="saveAPI()">Save</button>
+                <button class="test-btn" onclick="testConn()">Test connection</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Model Parameters -->
+          <div class="section-card">
+            <div class="section-card-title">Model Parameters</div>
+            <div class="section-card-desc">Controls LLM response characteristics</div>
+            <div class="field-group">
+              <div class="field">
+                <div class="field-label">Temperature</div>
+                <div class="slider-row">
+                  <input type="range" class="slider" min="0" max="2" step="0.05" value="0.7"
+                    oninput="updateSlider(this,'val-temp')">
+                  <span class="slider-val" id="val-temp">0.70</span>
+                </div>
+                <div class="api-pill">POST <span>/api/config/save</span> · field: temperature</div>
+              </div>
+              <div class="field">
+                <div class="field-label">Top-p</div>
+                <div class="slider-row">
+                  <input type="range" class="slider" min="0" max="1" step="0.05" value="0.9"
+                    oninput="updateSlider(this,'val-topp')">
+                  <span class="slider-val" id="val-topp">0.90</span>
+                </div>
+                <div class="api-pill">POST <span>/api/config/save</span> · field: top_p</div>
+              </div>
+              <div class="field">
+                <div class="field-label">Visual Factor
+                  <span style="font-size:10px;color:var(--text-muted);font-weight:400;margin-left:4px">weight of visual scoring</span>
+                </div>
+                <div class="slider-row">
+                  <input type="range" class="slider" min="0" max="1" step="0.05" value="0.3"
+                    oninput="updateSlider(this,'val-vf')">
+                  <span class="slider-val" id="val-vf">0.30</span>
+                </div>
+                <div class="api-pill">POST <span>/api/config/save</span> · field: visual_factor · module: visual_score_integrator</div>
+              </div>
+              <div class="btn-row">
+                <button class="save-btn" onclick="saveParams()">Save parameters</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <!-- Pipeline Config -->
+          <div class="section-card">
+            <div class="section-card-title">Pipeline Configuration</div>
+            <div class="section-card-desc">Data paths and clustering parameters → pipeline_config.yaml</div>
+            <div class="field-group">
+              <div class="field">
+                <div class="field-label">Data Path</div>
+                <input class="field-input" value="Tool-runner/151507" />
+                <div class="field-hint">Path to 10x Visium data directory</div>
+                <div class="api-pill">POST <span>/api/config/save</span> · field: data_path</div>
+              </div>
+              <div class="field">
+                <div class="field-label">Sample ID</div>
+                <input class="field-input" value="DLPFC_151507" />
+              </div>
+              <div class="field">
+                <div class="field-label">Number of Clusters</div>
+                <input class="field-input" type="number" value="7" min="2" max="20" />
+              </div>
+              <div class="field">
+                <div class="field-label">Methods</div>
+                <select class="field-select">
+                  <option selected>All 8 methods</option>
+                  <option>R methods only (IRIS, BASS, DR-SC, BayesSpace)</option>
+                  <option>Python methods only (SEDR, GraphST, STAGATE, stLearn)</option>
+                  <option>Custom selection</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="field-label">Skip Stages</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">
+                    <input type="checkbox"> skip_tool_runner
+                  </label>
+                  <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">
+                    <input type="checkbox"> skip_scoring
+                  </label>
+                  <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">
+                    <input type="checkbox"> vlm_off
+                  </label>
+                </div>
+              </div>
+              <button class="save-btn wide" onclick="savePipeline()">Save to pipeline_config.yaml</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- /main -->
+</div><!-- /app-shell -->
+
+<script>
+/* ── DOMAIN DATA ── */
+const METHODS = ['BASS','IRIS','GraphST','DR-SC','STAGATE','BayesSpace','stLearn','SEDR'];
+const DOMAINS = [
+  { id:0, color:'#3B82F6', name:'Domain 1', spots:512, method:'BASS',       annotation:'Layer VI (Multiform Layer)', score:0.91, markers:'OPRK1, KRT17, MFGE8', interp:['High OPRK1 expression consistent with deep cortical layers','Low mitotic activity — mature neuronal phenotype','Spatial boundary aligns with white matter interface'] },
+  { id:1, color:'#10B981', name:'Domain 2', spots:487, method:'GraphST',    annotation:'Layer V (Ganglionic Layer)', score:0.87, markers:'RORB, SEMA3E, PCP4', interp:['RORB+ neurons characteristic of mid-cortical layers','Moderate synaptic density based on gene co-expression','Adjacent to Layer IV boundary — consistent positioning'] },
+  { id:2, color:'#F59E0B', name:'Domain 3', spots:523, method:'STAGATE',    annotation:'Layer IV (Internal Granular)', score:0.83, markers:'KCNK2, CARTPT, PVALB', interp:['PVALB interneuron enrichment typical of Layer IV','Dense packing index matches granular layer morphology','Strong thalamocortical input signature'] },
+  { id:3, color:'#EF4444', name:'Domain 4', spots:498, method:'IRIS',       annotation:'Layer III (External Pyramidal)', score:0.79, markers:'CUX1, CUX2, SATB2', interp:['CUX1/CUX2 co-expression marks upper cortical layers','Callosal projection neuron signature present','Lower expression of deep-layer markers vs adjacent domains'] },
+  { id:4, color:'#8B5CF6', name:'Domain 5', spots:476, method:'DR-SC',      annotation:'Layer II (External Granular)', score:0.85, markers:'RASGRF2, ADAMTS2', interp:['Superficial cortical position confirmed spatially','High neuronal density relative to domain size','RASGRF2 enrichment distinguishes from Layer I'] },
+  { id:5, color:'#0EA5E9', name:'Domain 6', spots:503, method:'BayesSpace',  annotation:'White Matter', score:0.94, markers:'MBP, MOBP, PLP1', interp:['Very high MBP/MOBP expression — strong myelination signature','Low neuronal density consistent with white matter','Clear spatial demarcation from cortical layers'] },
+  { id:6, color:'#F97316', name:'Domain 7', spots:499, method:'SEDR',       annotation:'Layer I (Molecular Layer)', score:0.77, markers:'RELN, NR4A2, NDNF', interp:['RELN+ Cajal-Retzius cells — marker of marginal zone','Lowest neuronal density of all domains','Borders pia mater spatially'] },
+];
+
+/* ── NAVIGATION ── */
+const PAGE_META = {
+  analysis: ['Analysis', 'DLPFC_151507 · 7 domains'],
+  agents:   ['Agents', '2 active · 4 idle'],
+  settings: ['Settings', 'API · Pipeline · Preferences'],
+  chat:     ['Chat', 'claude-sonnet-4-6'],
+};
+
+function navigate(page) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navEl = document.getElementById('nav-' + page);
+  if (navEl) navEl.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
+  const meta = PAGE_META[page] || ['EnsAgent',''];
+  document.getElementById('topbar-title').textContent = meta[0];
+  document.getElementById('topbar-sub').textContent = meta[1];
+}
+
+/* ── SCATTER PLOT ── */
+function buildScatter(containerId, clickFn) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const w = el.offsetWidth || 320, h = 200;
+  const centers = [[0.22,0.28],[0.72,0.22],[0.50,0.52],[0.22,0.72],[0.78,0.72],[0.50,0.20],[0.50,0.82]];
+  DOMAINS.forEach((d, ci) => {
+    for (let i=0; i<42; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'scatter-dot';
+      dot.dataset.cluster = ci;
+      dot.style.width = dot.style.height = '7px';
+      dot.style.background = d.color;
+      dot.style.opacity = '0.82';
+      const x = centers[ci][0] + (Math.random()-0.5)*0.26;
+      const y = centers[ci][1] + (Math.random()-0.5)*0.26;
+      dot.style.left = Math.max(4,Math.min(w-12, x*w)) + 'px';
+      dot.style.top  = Math.max(4,Math.min(h-12, y*h)) + 'px';
+      if (clickFn) dot.addEventListener('click', () => clickFn(ci, dot));
+      el.appendChild(dot);
+    }
+  });
+}
+
+function buildLegend() {
+  const el = document.getElementById('cluster-legend');
+  DOMAINS.forEach((d,i) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.dataset.cluster = i;
+    item.innerHTML = `<div class="legend-dot" style="background:${d.color}"></div>${d.name}`;
+    item.addEventListener('click', () => selectCluster(i));
+    el.appendChild(item);
+  });
+}
+
+let selectedCluster = null;
+function selectCluster(ci) {
+  // Update dot styles
+  document.querySelectorAll('#anno-scatter .scatter-dot').forEach(dot => {
+    dot.classList.remove('selected');
+    dot.style.opacity = ci === null ? '0.82' : (parseInt(dot.dataset.cluster)===ci ? '1' : '0.25');
+  });
+  document.querySelectorAll('#cluster-legend .legend-item').forEach(item => {
+    item.classList.toggle('selected-legend', parseInt(item.dataset.cluster)===ci);
+  });
+  if (ci === null) {
+    document.getElementById('anno-empty').style.display='flex';
+    document.getElementById('anno-detail').classList.remove('visible');
+    return;
+  }
+  const d = DOMAINS[ci];
+  document.getElementById('anno-empty').style.display='none';
+  document.getElementById('anno-detail').classList.add('visible');
+  document.getElementById('anno-color').style.background = d.color;
+  document.getElementById('anno-name').textContent = d.name;
+  document.getElementById('anno-sub').textContent = `${d.spots} spots · cluster ${d.id}`;
+  document.getElementById('anno-annotation').textContent = d.annotation;
+  document.getElementById('anno-score-fill').style.width = (d.score*100)+'%';
+  document.getElementById('anno-score-val').textContent = d.score.toFixed(2);
+  document.getElementById('anno-markers').textContent = d.markers;
+  const interp = document.getElementById('anno-interp');
+  interp.innerHTML = d.interp.map(t=>`<div class="interp-item"><span class="interp-bullet">→</span><span>${t}</span></div>`).join('');
+  document.getElementById('anno-api-note').textContent = `GET /api/annotation/DLPFC_151507/${ci}`;
+  selectedCluster = ci;
+}
+
+function buildExprScatter() {
+  const el = document.getElementById('expr-scatter');
+  if (!el) return;
+  const w = el.offsetWidth||320, h=160;
+  const centers = [[0.22,0.28],[0.72,0.22],[0.50,0.52],[0.22,0.72],[0.78,0.72],[0.50,0.20],[0.50,0.82]];
+  DOMAINS.forEach((_,ci) => {
+    for (let i=0;i<35;i++){
+      const dot = document.createElement('div');
+      dot.className='scatter-dot'; dot.style.width=dot.style.height='6px';
+      const v=Math.random();
+      dot.style.background=`rgb(${Math.round(3+v*10)},${Math.round(104+v*55)},${Math.round(180+v*49)})`;
+      dot.style.cursor='default';
+      const x=centers[ci][0]+(Math.random()-0.5)*0.26;
+      const y=centers[ci][1]+(Math.random()-0.5)*0.26;
+      dot.style.left=Math.max(4,Math.min(w-10,x*w))+'px';
+      dot.style.top=Math.max(4,Math.min(h-10,y*h))+'px';
+      el.appendChild(dot);
+    }
+  });
+}
+
+function buildScoreChart() {
+  const el = document.getElementById('score-chart');
+  if (!el) return;
+  el.style.padding='10px 14px';
+  el.style.display='flex'; el.style.flexDirection='column'; el.style.gap='5px'; el.style.justifyContent='center';
+  DOMAINS.forEach(d => {
+    const row = document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:10px;';
+    row.innerHTML=`
+      <span style="width:58px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">${d.name}</span>
+      <div style="flex:1;height:5px;background:var(--bg-hover);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${d.score*100}%;background:${d.color};border-radius:3px"></div>
+      </div>
+      <span style="width:28px;text-align:right;color:var(--text-secondary);flex-shrink:0">${d.score.toFixed(2)}</span>
+      <span style="background:var(--bg-hover);border:1px solid var(--border);border-radius:3px;padding:0 4px;color:var(--text-muted);font-size:9px;flex-shrink:0;min-width:52px;text-align:center">${d.method}</span>`;
+    el.appendChild(row);
+  });
+}
+
+/* ── AGENTS ── */
+function selectAgent(id, cardEl) {
+  // Deselect if same
+  if (cardEl.classList.contains('selected-agent')) {
+    cardEl.classList.remove('selected-agent');
+    filterAgent('all', document.querySelector('.filter-btn.active-filter'));
+    return;
+  }
+  document.querySelectorAll('.agent-card').forEach(c => c.classList.remove('selected-agent'));
+  cardEl.classList.add('selected-agent');
+  filterAgent(id, null);
+}
+
+function filterAgent(agentId, btn) {
+  if (btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active-filter'));
+    btn.classList.add('active-filter');
+  }
+  const tag = document.getElementById('log-filter-tag');
+  document.querySelectorAll('.log-row').forEach(row => {
+    if (agentId === 'all') row.classList.remove('hidden-log');
+    else row.classList.toggle('hidden-log', row.dataset.agent !== agentId);
+  });
+  if (agentId === 'all') {
+    tag.style.display='none';
+    document.querySelectorAll('.agent-card').forEach(c=>c.classList.remove('selected-agent'));
+  } else {
+    tag.style.display='inline-flex'; tag.textContent = agentId;
+  }
+}
+
+function skipAgent(id) {
+  const card = document.getElementById('card-'+id);
+  card.style.opacity='0.5';
+  const tag = card.querySelector('.status-tag');
+  if(tag){ tag.textContent='SKIPPED'; tag.style.color='var(--warning)'; tag.style.borderColor='rgba(245,158,11,0.3)'; tag.style.background='rgba(245,158,11,0.08)'; }
+  // In real app: POST /api/pipeline/skip { stage: id }
+}
+
+/* ── SETTINGS ── */
+function updateSlider(input, valId) {
+  const v = parseFloat(input.value).toFixed(2);
+  document.getElementById(valId).textContent = v;
+}
+
+function onProviderChange(val) {
+  const endpoints = {
+    'OpenAI':'https://api.openai.com/v1','Azure OpenAI':'https://<resource>.openai.azure.com/',
+    'Anthropic':'https://api.anthropic.com','Google Gemini':'https://generativelanguage.googleapis.com/v1beta',
+    'OpenRouter':'https://openrouter.ai/api/v1','DeepSeek':'https://api.deepseek.com/v1',
+    'Groq':'https://api.groq.com/openai/v1','Together AI':'https://api.together.xyz/v1',
+    'Mistral':'https://api.mistral.ai/v1','xAI':'https://api.x.ai/v1',
+  };
+  document.getElementById('endpoint-input').placeholder = endpoints[val] || 'https://your-provider.com/v1';
+}
+
+function saveAPI() { alert('✓ Saved to pipeline_config.yaml\n→ POST /api/config/save'); }
+function testConn() { alert('Testing connection…\n→ POST /api/config/test_connection'); }
+function saveParams() { alert('✓ Model parameters saved\n→ POST /api/config/save'); }
+function savePipeline() { alert('✓ Pipeline config saved to pipeline_config.yaml\n→ POST /api/config/save'); }
+
+/* ── INIT ── */
+window.addEventListener('load', () => {
+  buildScatter('anno-scatter', (ci) => selectCluster(ci));
+  buildLegend();
+  buildExprScatter();
+  buildScoreChart();
+});
+</script>
+</body>
+</html>

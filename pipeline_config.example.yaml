@@ -52,8 +52,8 @@ env_names:
   PY: "PY"
   PY2: "PY2"
 
-# === Streamlit API Settings (written by Settings page) ==============
-# These generic fields are used by the Streamlit UI runtime.
+# === Settings/API Runtime Fields ====================================
+# These generic fields are used by the Settings page and runtime wrappers.
 # For Azure endpoints, matching azure_* fields below are also supported.
 api_provider: ""                # e.g. azure, openai, anthropic, openrouter
 api_key: ""                     # keep local only; do not commit secrets
@@ -61,6 +61,7 @@ api_endpoint: ""                # e.g. https://<resource>.openai.azure.com/
 api_version: ""                 # e.g. 2024-12-01-preview
 api_model: ""                   # canonical model/deployment field, e.g. gpt-4o / claude-3-5-sonnet-latest
 api_deployment: ""              # legacy alias (kept for backward compatibility)
+visual_factor: 0.5              # optional Stage B visual weighting knob used by the Settings page
 
 # === Legacy Azure API Aliases (Backward Compatibility) ==============
 # These are optional legacy aliases. For new setups, prefer api_* fields above.

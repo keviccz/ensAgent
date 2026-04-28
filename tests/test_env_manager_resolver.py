@@ -31,8 +31,9 @@ class EnvManagerResolverTests(unittest.TestCase):
                 return os.path.join("C:\\", "Tools", "mamba.exe")
             return None
 
-        with patch.object(env_mod.shutil, "which", side_effect=_which):
-            resolved = env_mod.resolve_conda_executable(cfg)
+        with patch.dict(os.environ, {"MAMBA_EXE": "", "CONDA_EXE": ""}, clear=False):
+            with patch.object(env_mod.shutil, "which", side_effect=_which):
+                resolved = env_mod.resolve_conda_executable(cfg)
 
         self.assertTrue(resolved["ok"])
         self.assertEqual(resolved["source"], "path")

@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnsAgent — Light Design Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-sidebar:     #F7F7F7;
+    --bg-main:        #FFFFFF;
+    --bg-surface:     #F3F4F6;
+    --bg-hover:       #EEEFF1;
+    --border:         rgba(0,0,0,0.08);
+    --border-soft:    rgba(0,0,0,0.05);
+    --accent:         #0A0A0A;
+    --accent-soft:    rgba(10,10,10,0.06);
+    --data:           #0EA5E9;
+    --data-soft:      rgba(14,165,233,0.10);
+    --data-glow:      rgba(14,165,233,0.20);
+    --text-primary:   #0A0A0A;
+    --text-secondary: #4B5563;
+    --text-muted:     #9CA3AF;
+    --success:        #10B981;
+    --warning:        #F59E0B;
+    --error:          #EF4444;
+    --font-ui:        'Sora', sans-serif;
+    --font-mono:      'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font-ui);
+    background: var(--bg-main);
+    color: var(--text-primary);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── SIDEBAR ────────────────────────────────── */
+  .sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Subtle dot-grid pattern */
+  .sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px);
+    background-size: 20px 20px;
+    pointer-events: none;
+  }
+
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 16px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    position: relative;
+  }
+
+  .brand-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+
+  .brand-name {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+
+  .brand-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .nav {
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: relative;
+  }
+
+  .nav-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 8px 8px 4px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text-secondary);
+    font-size: 13.5px;
+    font-weight: 400;
+    position: relative;
+  }
+
+  .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+  .nav-item.active {
+    background: var(--accent);
+    color: #FFFFFF;
+    font-weight: 500;
+  }
+
+  .nav-icon {
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    opacity: 0.6;
+  }
+  .nav-item.active .nav-icon { opacity: 1; }
+
+  .sidebar-divider {
+    height: 1px;
+    background: var(--border-soft);
+    margin: 4px 16px;
+  }
+
+  .conv-section {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 8px 16px;
+    position: relative;
+  }
+
+  .new-chat-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: all 0.15s;
+    font-family: var(--font-ui);
+    width: 100%;
+    background: var(--bg-main);
+  }
+  .new-chat-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .conv-item {
+    padding: 7px 10px;
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.12s;
+  }
+  .conv-item:hover { background: var(--bg-hover); color: var(--text-secondary); }
+  .conv-item.active-conv {
+    background: var(--bg-main);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+  }
+
+  /* ── MAIN ───────────────────────────────────── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-main);
+  }
+
+  .topbar {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .page-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+  }
+
+  .topbar-dot {
+    width: 4px; height: 4px;
+    background: var(--data);
+    border-radius: 50%;
+  }
+
+  .page-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── CHAT ───────────────────────────────────── */
+  .chat-messages {
+    flex: 1;
+    padding: 32px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: 860px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .msg { display: flex; gap: 14px; align-items: flex-start; }
+  .msg.user { flex-direction: row-reverse; }
+
+  .avatar {
+    width: 30px; height: 30px;
+    border-radius: 7px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .avatar.ens {
+    background: var(--accent);
+    color: #FFFFFF;
+    font-size: 13px;
+  }
+  .avatar.usr {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+
+  .bubble {
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    line-height: 1.65;
+    max-width: 640px;
+  }
+  .bubble.ens {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+  .bubble.usr {
+    background: var(--accent);
+    color: #FFFFFF;
+  }
+
+  .tool-call {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--data-soft);
+    border: 1px solid rgba(14,165,233,0.18);
+    border-radius: 7px;
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--data);
+  }
+
+  .tool-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--data);
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .thinking-block {
+    padding: 8px 12px;
+    background: #FAFAFA;
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--text-muted);
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 8px;
+  }
+  .thinking-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .thinking-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  /* ── PROGRESS CARD ──────────────────────────── */
+  .progress-card {
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .progress-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+  }
+  .progress-icon { width: 14px; text-align: center; }
+  .progress-name { width: 80px; color: var(--text-secondary); }
+  .progress-bar-bg {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-surface);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar-fill { height: 100%; border-radius: 2px; }
+  .progress-pct { width: 32px; text-align: right; }
+
+  /* ── INPUT ──────────────────────────────────── */
+  .chat-input-area {
+    padding: 16px 60px 24px;
+    max-width: 860px;
+    margin: 0 auto;
+    width: 100%;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .input-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .input-wrapper:focus-within {
+    border-color: rgba(0,0,0,0.2);
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.04);
+  }
+
+  .input-field {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    line-height: 1.5;
+    resize: none;
+    min-height: 22px;
+  }
+  .input-field::placeholder { color: var(--text-muted); }
+
+  .send-btn {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-size: 14px;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { opacity: 0.75; }
+
+  /* ── PALETTE STRIP ──────────────────────────── */
+  .palette-strip {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 7px 16px;
+    align-items: center;
+    z-index: 100;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  }
+  .swatch {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.1);
+  }
+  .palette-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  /* ── BADGE ──────────────────────────────────── */
+  .preview-badge {
+    position: fixed;
+    top: 14px; right: 20px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+
+<div class="preview-badge">Chat View · Light</div>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">🧬</div>
+    <div>
+      <div class="brand-name">EnsAgent</div>
+      <div class="brand-sub">Spatial Trans.</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-label">Navigation</div>
+    <div class="nav-item active">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M2 4h12M2 8h12M2 12h7"/>
+      </svg>
+      Chat
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="5" cy="11" r="1.5"/><circle cx="9" cy="7" r="1.5"/>
+        <circle cx="13" cy="10" r="1.5"/><circle cx="3" cy="14" r="1.5"/>
+      </svg>
+      Analysis
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="1" y="5" width="4" height="4" rx="1"/>
+        <rect x="6" y="2" width="4" height="4" rx="1"/>
+        <rect x="11" y="5" width="4" height="4" rx="1"/>
+      </svg>
+      Agents
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="8" cy="8" r="2.5"/>
+        <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M11.54 4.46l-1.41 1.41M4.46 11.54l-1.41 1.41"/>
+      </svg>
+      Settings
+    </div>
+  </nav>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="conv-section">
+    <button class="new-chat-btn">＋ New Chat</button>
+    <div class="nav-label">Recent</div>
+    <div class="conv-item active-conv">Run DLPFC_151507 full pipeline</div>
+    <div class="conv-item">Check scoring results for sample</div>
+    <div class="conv-item">Annotate domains with multi-agent</div>
+    <div class="conv-item">Configure Azure OpenAI endpoint</div>
+    <div class="conv-item">What clustering methods are avail...</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <span class="page-title">Chat</span>
+    <span class="topbar-dot"></span>
+    <span class="page-sub">claude-sonnet-4-6</span>
+  </div>
+
+  <div class="content">
+    <div class="chat-messages">
+
+      <!-- USER -->
+      <div class="msg user">
+        <div class="avatar usr">U</div>
+        <div class="bubble usr">
+          Run the full end-to-end pipeline on DLPFC_151507 with 7 clusters.
+        </div>
+      </div>
+
+      <!-- ASSISTANT -->
+      <div class="msg">
+        <div class="avatar ens">E</div>
+        <div style="display:flex;flex-direction:column;gap:6px;max-width:640px;">
+          <div class="thinking-block">
+            <div class="thinking-label">Reasoning</div>
+            <div class="thinking-text">User wants to run all 4 pipeline stages on DLPFC_151507. I'll call run_end_to_end with n_clusters=7…</div>
+          </div>
+          <div class="bubble ens">
+            Starting full pipeline for
+            <code style="font-family:var(--font-mono);font-size:12px;color:var(--data);background:var(--data-soft);padding:1px 5px;border-radius:4px">DLPFC_151507</code>
+            with <strong>7 clusters</strong>.
+            <div class="tool-call">
+              <div class="tool-dot"></div>
+              run_end_to_end · n_clusters=7 · sample_id=DLPFC_151507
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PIPELINE PROGRESS -->
+      <div class="msg">
+        <div class="avatar ens">E</div>
+        <div style="max-width:420px;">
+          <div class="progress-card">
+            <div class="progress-title">Pipeline progress</div>
+
+            <div class="progress-row">
+              <span class="progress-icon" style="color:var(--success)">✓</span>
+              <span class="progress-name">Stage A</span>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width:100%;background:var(--success)"></div>
+              </div>
+              <span class="progress-pct" style="color:var(--success);font-family:var(--font-mono);font-size:11px">100%</span>
+            </div>
+
+            <div class="progress-row">
+              <span class="progress-icon" style="color:var(--data)">◎</span>
+              <span class="progress-name">Stage B</span>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width:62%;background:var(--data)"></div>
+              </div>
+              <span class="progress-pct" style="color:var(--data);font-family:var(--font-mono);font-size:11px">62%</span>
+            </div>
+
+            <div class="progress-row">
+              <span class="progress-icon" style="color:var(--text-muted)">○</span>
+              <span class="progress-name" style="color:var(--text-muted)">Stage C</span>
+              <div class="progress-bar-bg"></div>
+              <span class="progress-pct" style="color:var(--text-muted);font-family:var(--font-mono);font-size:11px">—</span>
+            </div>
+
+            <div class="progress-row">
+              <span class="progress-icon" style="color:var(--text-muted)">○</span>
+              <span class="progress-name" style="color:var(--text-muted)">Stage D</span>
+              <div class="progress-bar-bg"></div>
+              <span class="progress-pct" style="color:var(--text-muted);font-family:var(--font-mono);font-size:11px">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- INPUT -->
+    <div class="chat-input-area">
+      <div class="input-wrapper">
+        <textarea class="input-field" placeholder="Message EnsAgent…" rows="1"></textarea>
+        <button class="send-btn">↑</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PALETTE STRIP -->
+<div class="palette-strip">
+  <span class="palette-label">Palette</span>
+  <div class="swatch" style="background:#F7F7F7" title="Sidebar"></div>
+  <div class="swatch" style="background:#FFFFFF" title="Main bg"></div>
+  <div class="swatch" style="background:#F3F4F6" title="Surface"></div>
+  <div class="swatch" style="background:#0A0A0A" title="Accent (black)"></div>
+  <div class="swatch" style="background:#0EA5E9" title="Data (sky)"></div>
+  <div class="swatch" style="background:#10B981" title="Success"></div>
+  <span class="palette-label" style="margin-left:8px">Sora + JetBrains Mono</span>
+</div>
+
+</body>
+</html>

@@ -1,51 +1,105 @@
-# Repository Guidelines
+# AGENTS.md — EnsAgent Agent Guide
 
-## Project Structure & Module Organization
-EnsAgent is organized by pipeline stage. Use these directories as ownership boundaries:
-- `ensagent_tools/`: unified tool layer — config management, tool registry, and wrappers for all pipeline stages.
-- `Tool-runner/`: clustering orchestration (`orchestrator.py`), tool scripts (`tools/`), post-processing (`postprocess/`), and sample configs (`configs/`).
-- `scoring/`: consensus scoring, matrix generation, and annotation entrypoints.
-- `ensemble/`: BEST artifact builder (`build_best.py`).
-- `annotation/annotation_multiagent/`: multi-agent annotation workflow.
-- `streamlit_app/`: UI (`main.py`).
-- `ensagent_agent/`: CLI LLM chat agent (`chat.py`).
-- `envs/`: R / PY / PY2 environment definitions (single canonical location).
-- `tests/`: Python unit tests.
-- `endtoend.py`: top-level pipeline runner (loads `pipeline_config.yaml`).
-- `pipeline_config.yaml`: user-editable pipeline configuration (copy from `pipeline_config.example.yaml`).
+Use this file as the primary onboarding document for coding agents working in this repository. Open `README.md` for fuller product/setup context and `CLAUDE.md` for additional project notes, but start here.
 
-## Build, Test, and Development Commands
-- `mamba env create -f environment.yml && mamba activate ensagent`: create the main dev environment.
-- `python endtoend.py`: run the full pipeline using `pipeline_config.yaml`.
-- `python endtoend.py --data_path "<VISIUM_DIR>" --sample_id "DLPFC_151507"`: override config via CLI.
-- `python Tool-runner/orchestrator.py --config Tool-runner/configs/DLPFC_151507.yaml`: run Tool-runner only.
-- `python scoring/scoring.py`: run scoring only.
-- `streamlit run streamlit_app/main.py`: start the web UI locally.
-- `python -m ensagent_agent.chat`: start the CLI LLM agent.
-- `python -m unittest discover -s tests -v`: run unit tests.
+## Repo Purpose
+EnsAgent is an ensemble multi-agent framework for spatial transcriptomics analysis on 10x Visium data. The stable pipeline is:
 
-## Coding Style & Naming Conventions
-Target Python 3.10+ and follow PEP 8 with 4-space indentation. Use:
-- `snake_case` for files, functions, variables, and CLI flags.
-- `PascalCase` for classes (see `tests/` patterns).
-- Type hints on new/edited public functions.
+1. Tool-Runner
+2. Scoring
+3. BEST Builder
+4. Annotation
 
-No repo-level formatter/linter config is currently committed; keep style consistent with existing modules and run local formatting/linting tools before opening a PR.
+## Architecture Map
+- `ensagent_tools/`: shared integration layer. Holds config loading/saving, tool schemas, tool dispatch, subprocess helpers, and stage wrappers used by the CLI agent, API, and pipeline entrypoints.
+- `Tool-runner/`: Stage A clustering orchestration and post-processing.
+- `scoring/`: Stage B scoring, consensus matrix generation, provider runtime, and annotation entrypoints.
+- `ensemble/`: Stage C BEST artifact generation via `build_best.py`.
+- `annotation/annotation_multiagent/`: Stage D multi-agent annotation workflow.
+- `api/`: FastAPI backend. Route modules live under `api/routes/`.
+- `frontend/`: Next.js web app. App routes are under `frontend/app/`, shared UI under `frontend/components/`, and client API/state types under `frontend/lib/`.
+- `ensagent_agent/`: CLI chat agent that uses the same tool registry as the web stack.
+- `envs/`: canonical environment YAMLs for R / PY / PY2 tool environments.
+- `tests/`: `unittest` test suite.
+- `start.py`: launches the FastAPI backend and Next.js frontend together for local development.
+- `endtoend.py`: top-level pipeline runner that loads `pipeline_config.yaml`.
+- `pipeline_config.example.yaml`: template for local pipeline configuration.
+- `pipeline_config.yaml`: local working config copied from the example template.
 
-## Testing Guidelines
-Tests use the standard library `unittest` framework. Place tests in `tests/` and name files `test_*.py`. Keep tests deterministic, fast, and independent of external services. For new functionality, add or update focused tests near the changed behavior (for example orchestration paths, config loading, and health checks). No formal coverage threshold is enforced yet, but critical branches should be exercised.
+## Task Routing
+- Pipeline behavior or stage orchestration:
+  Start in `ensagent_tools/`, then inspect the stage implementation in `Tool-runner/`, `scoring/`, `ensemble/`, or `annotation/`.
+- API behavior:
+  Start in `api/routes/` and check the matching wrapper or config logic in `ensagent_tools/`.
+- Frontend behavior:
+  Start in `frontend/app/` for route-level changes, `frontend/components/` for UI behavior, and `frontend/lib/` for API clients, types, and store logic.
+- Chat or tool-calling behavior:
+  Start in `api/routes/chat.py`, `ensagent_tools/registry.py`, and `ensagent_agent/chat.py`.
+- Config loading or persistence:
+  Start in `ensagent_tools/config_manager.py`, then verify related defaults and comments in `pipeline_config.example.yaml`.
+- Environment setup and health checks:
+  Start in `envs/`, `ensagent_tools/env_manager.py`, and `tools/health_check.py`.
 
-## Commit & Pull Request Guidelines
-- Commit subject in imperative mood, under 72 chars (example: `Add health check for Azure env vars`).
-- Keep commits scoped to one logical change.
-- PRs should include: purpose, key files changed, commands run for validation, and sample output/screenshots for UI changes (`streamlit_app/`).
+## Core Commands
+- Create the main environment and install dependencies:
+  `mamba env create -f environment.yml && mamba activate ensagent`
+  `python -m pip install -r requirements.txt`
+- Run the full pipeline:
+  `python endtoend.py`
+- Run the full pipeline with CLI overrides:
+  `python endtoend.py --data_path "<VISIUM_DIR>" --sample_id "DLPFC_151507"`
+- Run Tool-Runner only:
+  `python Tool-runner/orchestrator.py --config Tool-runner/configs/DLPFC_151507.yaml`
+- Run Scoring only:
+  `python scoring/scoring.py`
+- Run the local web app stack:
+  `python start.py`
+- Run the CLI chat agent:
+  `python -m ensagent_agent.chat`
+- Run the health check:
+  `python tools/health_check.py`
+- Run Python tests:
+  `python -m unittest discover -s tests -v`
+- Build the frontend:
+  `cd frontend && npm run build`
 
-## Security & Configuration Tips
-Never commit secrets. Configure Azure OpenAI credentials via environment variables (`AZURE_OPENAI_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_VERSION`). Keep `pipeline_config.yaml` git-ignored if it contains API keys. Keep generated outputs under `output/` and avoid checking in large data artifacts unless explicitly required.
+## Working Rules
+- Target Python 3.10+ and follow PEP 8 with 4-space indentation.
+- Use `snake_case` for files, functions, variables, and CLI flags. Use `PascalCase` for classes.
+- Add type hints to new or edited public Python functions.
+- Tests use the standard library `unittest` framework. Add focused tests under `tests/test_*.py`.
+- Prefer small, local edits in stable source directories over broad refactors.
+- Treat `pipeline_config.yaml` as local user state. Do not edit it unless the task is explicitly about runtime configuration.
+- Treat `output/`, `output_log/`, `scoring/output/`, `uploads/`, and `frontend/.next/` as generated or runtime state, not primary sources of truth.
+- Do not commit secrets. Prefer environment variables for provider credentials.
+- Do not revert unrelated user changes in the worktree.
 
-## Agent Skills Usage
-When a task matches an installed skill (or a user explicitly names one, such as `$data-analysis`), apply that skill workflow first.
-- Open the skill's `SKILL.md` and follow only the steps needed for the current task.
-- Prefer the minimal set of skills that covers the request; if multiple are needed, state usage order briefly.
-- Reuse referenced scripts/templates from the skill directory instead of rewriting from scratch.
-- If a skill is unavailable or incomplete, state the gap and continue with the closest safe fallback.
+## Agent Skill Usage
+- If a task matches an installed skill, apply that skill workflow first.
+- Use the minimal set of skills that covers the task and state the order briefly when multiple skills apply.
+- Reuse referenced scripts, templates, and helper assets from the skill when available instead of recreating them.
+- If a required skill is unavailable or incomplete, state the gap and continue with the closest safe fallback.
+
+## Validation Guide
+- Docs-only or guidance-only changes:
+  Re-read the referenced paths and commands for accuracy. Run the narrowest relevant consistency checks if the docs describe tested behavior.
+- `ensagent_tools/` or pipeline wrapper changes:
+  Run the most relevant `unittest` modules first. Run `python -m unittest discover -s tests -v` if shared behavior changed.
+- API changes:
+  Run the relevant unit tests if present, then run `python tools/health_check.py`. Use `python start.py` for a local integration smoke test when request/response behavior changed.
+- Frontend changes:
+  Run `cd frontend && npm run build`. If the change crosses the API/UI boundary, also smoke test with `python start.py`.
+- End-to-end workflow changes:
+  Validate the smallest relevant stage command before running `python endtoend.py`.
+
+## Commit And PR Expectations
+- Commit messages should use the imperative mood and stay under 72 characters.
+- Keep each commit scoped to one logical change.
+- PRs should include purpose, key files changed, validation commands run, and screenshots for UI changes under `frontend/` or API/UI flow changes under `api/`.
+
+## Security And Configuration Notes
+- Preferred credential path:
+  `ENSAGENT_API_PROVIDER`, `ENSAGENT_API_KEY`, `ENSAGENT_API_MODEL`, and related environment variables.
+- Azure compatibility aliases are still supported:
+  `AZURE_OPENAI_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_VERSION`.
+- Keep large generated data artifacts out of git unless the task explicitly requires them.

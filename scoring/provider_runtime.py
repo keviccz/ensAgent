@@ -383,6 +383,58 @@ def completion_text(
     return _extract_response_text(response)
 
 
+async def completion_text_stream(
+    config: "ProviderConfig",
+    messages: List[Dict[str, Any]],
+    *,
+    model: str | None = None,
+    temperature: float = 0.7,
+    top_p: float = 1.0,
+    max_tokens: int = 2048,
+):
+    """Async generator that yields text delta chunks from the LLM via litellm streaming."""
+    import asyncio
+
+    provider = normalize_provider(config.provider) or detect_provider(config.endpoint) or "openai"
+    requested_model = (model or config.model or "gpt-4o")
+    resolved_model = resolve_litellm_model(provider=provider, model=requested_model)
+
+    kwargs: Dict[str, Any] = {
+        "model": resolved_model,
+        "messages": messages,
+        "temperature": float(temperature),
+        "top_p": float(top_p),
+        "max_tokens": int(max_tokens),
+        "stream": True,
+    }
+    if config.api_key:
+        kwargs["api_key"] = config.api_key
+    if config.endpoint and provider in {
+        "openai", "openai_compatible", "others", "azure",
+        "openrouter", "deepseek", "groq", "together_ai",
+        "mistral", "cohere", "xai", "perplexity",
+    }:
+        kwargs["api_base"] = config.endpoint
+    if config.api_version and provider == "azure":
+        kwargs["api_version"] = config.api_version
+
+    def _sync_stream():
+        from litellm import completion as litellm_completion  # type: ignore
+        return list(litellm_completion(**kwargs))
+
+    loop = asyncio.get_event_loop()
+    chunks = await loop.run_in_executor(None, _sync_stream)
+
+    for chunk in chunks:
+        delta = ""
+        try:
+            delta = chunk.choices[0].delta.content or ""
+        except Exception:
+            pass
+        if delta:
+            yield delta
+
+
 def parse_json_text(raw_text: str) -> Dict[str, Any]:
     cleaned = re.sub(r"```json|```", "", str(raw_text or ""), flags=re.IGNORECASE).strip()
     data = json.loads(cleaned)

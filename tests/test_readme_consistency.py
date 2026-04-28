@@ -10,11 +10,12 @@ class ReadmeConsistencyTests(unittest.TestCase):
         text = (repo / "README.md").read_text(encoding="utf-8")
         self.assertNotIn("environment.fast.yml", text)
 
-    def test_readme_uses_chevron_history_menu_wording(self) -> None:
+    def test_readme_documents_nextjs_launcher_and_not_streamlit(self) -> None:
         repo = Path(__file__).resolve().parent.parent
         text = (repo / "README.md").read_text(encoding="utf-8")
-        self.assertIn("right-side chevron menu", text)
-        self.assertNotIn("use the `...` menu on each history item", text)
+        self.assertIn("python start.py", text)
+        self.assertNotIn("streamlit run streamlit_app/main.py", text)
+        self.assertNotIn("## Streamlit UI", text)
 
 
 if __name__ == "__main__":

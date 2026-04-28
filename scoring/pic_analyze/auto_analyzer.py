@@ -15,6 +15,24 @@ try:
 except Exception:  # pragma: no cover - script-mode fallback
     from azure_client import AzureOpenAIClient
 
+try:
+    from .sample_context import (
+        display_sample_id,
+        domain_report_filename,
+        resolve_sample_id,
+        visual_scores_filename,
+    )
+except Exception:  # pragma: no cover - script-mode fallback
+    _MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+    if _MODULE_DIR not in sys.path:
+        sys.path.insert(0, _MODULE_DIR)
+    from sample_context import (
+        display_sample_id,
+        domain_report_filename,
+        resolve_sample_id,
+        visual_scores_filename,
+    )
+
 
 def _load_image_manager_class():
     try:
@@ -31,7 +49,7 @@ def _load_image_manager_class():
 class AutoClusteringAnalyzer:
     """自动聚类分析器，对domain1-7进行批量分析"""
     
-    def __init__(self):
+    def __init__(self, sample_id: str | None = None, output_dir: str = "output"):
         """初始化自动聚类分析器"""
         self.azure_client = None
         self._azure_client_error = None
@@ -46,7 +64,10 @@ class AutoClusteringAnalyzer:
             )
         ImageManager = _load_image_manager_class()
         self.image_manager = ImageManager()
-        self.output_dir = "output"
+        self.sample_id = resolve_sample_id(sample_id)
+        self.sample_display_id = display_sample_id(self.sample_id)
+        self.output_dir = str(output_dir or "output")
+        self.summary_json_name = visual_scores_filename(self.sample_id)
         
         # 确保输出目录存在
         os.makedirs(self.output_dir, exist_ok=True)
@@ -70,8 +91,7 @@ class AutoClusteringAnalyzer:
     def _load_existing_scores(self) -> None:
         """从已有 JSON 中加载历史评分，方便单 domain 增量运行"""
         try:
-            json_filename = "all_domains_scores.json"
-            json_path = os.path.join(self.output_dir, json_filename)
+            json_path = os.path.join(self.output_dir, self.summary_json_name)
             if os.path.exists(json_path):
                 with open(json_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -85,7 +105,7 @@ class AutoClusteringAnalyzer:
         """Get analysis prompt for specified domain"""
         base_prompt = f"""Please act as a professional bioinformatics expert and perform a comparative analysis of these DLPFC (Dorsolateral Prefrontal Cortex) slice clustering images, focusing on domain{domain_num} region.
 
-**TISSUE CONTEXT**: You are analyzing human DLPFC brain tissue samples (151507) generated using the 10x Genomics Visium spatial transcriptomics platform. DLPFC is a critical cortical region involved in executive functions and working memory, characterized by distinct cortical layers (Layer 1-6) and underlying white matter. The Visium platform captures spatially-resolved gene expression at 55μm resolution spots across the tissue section. This layered architecture contains different cell types including neurons, oligodendrocytes, astrocytes, and microglia arranged in functionally distinct layers.
+**TISSUE CONTEXT**: You are analyzing human DLPFC brain tissue samples ({self.sample_display_id}) generated using the 10x Genomics Visium spatial transcriptomics platform. DLPFC is a critical cortical region involved in executive functions and working memory, characterized by distinct cortical layers (Layer 1-6) and underlying white matter. The Visium platform captures spatially-resolved gene expression at 55μm resolution spots across the tissue section. This layered architecture contains different cell types including neurons, oligodendrocytes, astrocytes, and microglia arranged in functionally distinct layers.
 
 ## Analysis Requirements:
 
@@ -713,6 +733,9 @@ Please ensure analysis is objective and professional, conduct scientific assessm
                 print(f"   匹配示例: {all_matches[:3]}")
         
         return scores
+
+    def report_filename_for_domain(self, domain_num: int) -> str:
+        return domain_report_filename(domain_num, self.sample_id)
     
     def save_domain_report(self, result: Dict[str, Any]) -> str:
         """保存单个domain的分析报告"""
@@ -720,12 +743,12 @@ Please ensure analysis is objective and professional, conduct scientific assessm
             domain_num = result['domain']
             
             # 保存文本报告（无时间后缀，直接覆盖）
-            txt_filename = f"domain{domain_num}_report.txt"
+            txt_filename = self.report_filename_for_domain(domain_num)
             txt_path = os.path.join(self.output_dir, txt_filename)
             
             with open(txt_path, 'w', encoding='utf-8') as f:
                 f.write("=" * 80 + "\n")
-                f.write(f"DLPFC Domain{domain_num} 聚类图片横向对比分析报告\n")
+                f.write(f"{self.sample_display_id} Domain{domain_num} 聚类图片横向对比分析报告\n")
                 f.write("=" * 80 + "\n\n")
                 
                 f.write(f"分析时间: {result['analysis_time']}\n")
@@ -765,8 +788,7 @@ Please ensure analysis is objective and professional, conduct scientific assessm
     def save_summary_json(self) -> str:
         """保存汇总的JSON评分文件"""
         try:
-            json_filename = "all_domains_scores.json"
-            json_path = os.path.join(self.output_dir, json_filename)
+            json_path = os.path.join(self.output_dir, self.summary_json_name)
             
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(self.all_scores, f, ensure_ascii=False, indent=2)
@@ -912,25 +934,41 @@ def main():
         # 确保必要文件夹存在
         os.makedirs('uploads', exist_ok=True)
         os.makedirs('output', exist_ok=True)
-        
-        # 启动自动分析
-        analyzer = AutoClusteringAnalyzer()
 
         # 解析命令行：
-        #   --domainX       只跑指定 domain（如 --domain1 --domain3）
-        #   --method=GraphST 只覆盖指定方法的分数，其它方法保持历史结果
+        #   --domainX         只跑指定 domain（如 --domain1 --domain3）
+        #   --method=GraphST  只覆盖指定方法的分数，其它方法保持历史结果
+        #   --sample_id ...   使用指定样本上下文命名输出
         selected_domains: List[int] = []
         selected_methods: List[str] = []
-        for arg in sys.argv[1:]:
+        cli_sample_id = ""
+        args = sys.argv[1:]
+        idx = 0
+        while idx < len(args):
+            arg = args[idx]
+            if arg == "--sample_id":
+                if idx + 1 < len(args):
+                    cli_sample_id = args[idx + 1]
+                idx += 2
+                continue
+            if arg.startswith("--sample_id="):
+                cli_sample_id = arg.split("=", 1)[1]
+                idx += 1
+                continue
             m_domain = re.match(r"--domain(\d+)$", arg)
             m_method = re.match(r"--method=(\w+)$", arg)
             if m_domain:
                 try:
                     selected_domains.append(int(m_domain.group(1)))
                 except ValueError:
+                    idx += 1
                     continue
             elif m_method:
                 selected_methods.append(m_method.group(1))
+            idx += 1
+
+        # 启动自动分析
+        analyzer = AutoClusteringAnalyzer(sample_id=cli_sample_id or None)
 
         if selected_domains:
             domains = sorted(set(selected_domains))

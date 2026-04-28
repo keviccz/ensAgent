@@ -1,4 +1,4 @@
-name: ensagent  # main env for: scoring + annotation + ensagent_agent + streamlit_app
+name: ensagent  # main env for: scoring + annotation + ensagent_agent + api
 channels:
   - conda-forge
   # Only conda-forge (no defaults) to avoid OOM when solving with many channels
@@ -19,9 +19,8 @@ dependencies:
   - typing-extensions
   - python-dotenv
   - pillow
-  # UI (streamlit_app)
+  # Web app/runtime support
   - plotly
-  - streamlit
   - pip:
       # Single Python dependency source (root file)
       - -r requirements.txt
