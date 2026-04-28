@@ -1,6 +1,6 @@
-# EnsAgent
 
 <div align="center">
+  <h1>EnsAgent</h1>
   <h3>面向空间转录组的集成式多智能体分析框架</h3>
   <p>
     <a href="README.md">English</a> | <b>中文</b>
