@@ -9,14 +9,13 @@
     <a href="#quick-start">Quick Start</a> ·
     <a href="#method-code-and-data-availability">Method & Data</a> ·
     <a href="#core-commands">Commands</a> ·
-    <a href="https://github.com/keviccz/ensAgent/raw/main/Readme_example/Frontend-use.mp4">Demo Video</a>
+    <a href="#demo-video">Demo Video</a>
   </p>
   <img src="Readme_example/Diagram.png" alt="EnsAgent pipeline diagram" width="900">
   <br>
   <br>
-  <a href="https://github.com/keviccz/ensAgent/raw/main/Readme_example/Frontend-use.mp4">
-    <img src="example_data/spatial_clustering_result_20251201_012647.png" alt="EnsAgent frontend demo preview" width="720">
-  </a>
+  <a id="demo-video"></a>
+  <video src="Readme_example/Frontend-use.mp4" controls muted width="720"></video>
   <br>
   <a href="https://github.com/keviccz/ensAgent/raw/main/Readme_example/Frontend-use.mp4">Watch the frontend demo video</a>
 </div>
