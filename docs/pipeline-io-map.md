@@ -1,36 +1,34 @@
 # Pipeline I/O Map
 
-日期：2026-04-10
+Updated: 2026-04-10
 
-## 总览
+## Overview
 
-EnsAgent 当前推荐的数据流是：
+The recommended EnsAgent data flow is:
 
-1. Stage A `Tool-runner`
-2. Stage A -> B staging
-3. Stage B `Scoring`
-4. Stage C `BEST Builder`
-5. Stage D `Annotation`
-6. API / Frontend 只读取样本级输出
+1. Stage A runs clustering methods through Tool-Runner.
+2. Stage A outputs are staged into scoring inputs.
+3. Stage B scores method/domain evidence and builds consensus matrices.
+4. Stage C builds BEST artifacts from scores and labels.
+5. Stage D annotates BEST domains.
+6. API and frontend routes read sample-scoped outputs.
 
-## Stage A: Tool-runner
+## Stage A: Tool-Runner
 
-入口：
+Entrypoint:
 
 - `Tool-runner/orchestrator.py`
-- `ensagent_tools/tool_runner.py`
-- `ensagent_tools/pipeline.py`
+- Wrapper: `ensagent_tools/tool_runner.py`
 
-主要输入：
+Inputs:
 
 - `data_path`
 - `sample_id`
 - `methods`
 - `n_clusters`
-- `random_seed`
-- 环境解析结果（`conda_exe`、env 名）
+- resolved Conda/Mamba executable and method environment names
 
-规范输出：
+Outputs:
 
 - `output/tool_runner/<sample_id>/domains/`
 - `output/tool_runner/<sample_id>/spot/`
@@ -39,27 +37,28 @@ EnsAgent 当前推荐的数据流是：
 - `output/tool_runner/<sample_id>/PICTURES/`
 - `output/tool_runner/<sample_id>/tool_runner_report.json`
 
-下游消费者：
+Downstream consumers:
 
-- Stage A -> B staging
+- Stage B staging and scoring
+- API/frontend visualizations
 
-## Stage A -> B Staging
+## Stage A to Stage B Staging
 
-入口：
+Entrypoint:
 
-- `ensagent_tools/pipeline.py::stage_toolrunner_outputs`
+- `ensagent_tools/scoring.py`
 
-作用：
+Purpose:
 
-- 把 Stage A 的 `spot/`、`DEGs/`、`PATHWAY/` 复制并标准化到 `scoring/input/`
+- Copy and normalize Stage A `spot/`, `DEGs/`, and `PATHWAY/` files into `scoring/input/`.
 
-主要输入：
+Inputs:
 
-- `output/tool_runner/<sample_id>/spot/`
-- `output/tool_runner/<sample_id>/DEGs/`
-- `output/tool_runner/<sample_id>/PATHWAY/`
+- `tool_output_dir`
+- `csv_path`
+- `sample_id`
 
-规范输出：
+Output:
 
 - `scoring/input/*_<sample_id>_spot.csv`
 - `scoring/input/*_<sample_id>_DEGs.csv`
@@ -67,113 +66,99 @@ EnsAgent 当前推荐的数据流是：
 
 ## Stage B: Scoring
 
-入口：
+Entrypoint:
 
 - `scoring/scoring.py`
-- `ensagent_tools/scoring.py`
+- Wrapper: `ensagent_tools/scoring.py`
 
-主要输入：
+Inputs:
 
 - `scoring/input/`
-- API/provider 配置
-- `sample_id`
-- 视觉评分缓存与图片分析输入
+- provider/API configuration
+- optional visual scoring cache and image analysis inputs
 
-规范输出：
+Outputs:
 
-- `scoring/output/<sample_id>/`
 - `scoring/output/<sample_id>/consensus/scores_matrix.csv`
 - `scoring/output/<sample_id>/consensus/labels_matrix.csv`
+- method/domain scoring logs and intermediate scoring artifacts
 
-下游消费者：
+Downstream consumers:
 
-- Stage C `BEST Builder`
-- `/api/data/scores`
+- Stage C BEST builder
+- API `/api/data/scores`
 
 ## Stage C: BEST Builder
 
-入口：
+Entrypoint:
 
 - `ensemble/build_best.py`
-- `ensagent_tools/best_builder.py`
+- Wrapper: `ensagent_tools/best_builder.py`
 
-主要输入：
+Inputs:
 
-- `scoring/output/<sample_id>/consensus/scores_matrix.csv`
-- `scoring/output/<sample_id>/consensus/labels_matrix.csv`
-- `scoring/input/*_<sample_id>_spot.csv`
+- `scores_matrix.csv`
+- `labels_matrix.csv`
+- spot template CSV
 - `visium_dir`
-- 可选 `truth_file`
+- optional truth file
 
-规范输出：
+Outputs:
 
 - `output/best/<sample_id>/BEST_<sample_id>_spot.csv`
 - `output/best/<sample_id>/BEST_<sample_id>_DEGs.csv`
 - `output/best/<sample_id>/BEST_<sample_id>_PATHWAY.csv`
 - `output/best/<sample_id>/<sample_id>_result.png`
-- 可选 `output/best/<sample_id>/ari.json`
+- optional `output/best/<sample_id>/ari.json`
 
-下游消费者：
+Downstream consumers:
 
-- Stage D `Annotation`
-- `/api/data/spatial`
+- Stage D annotation
+- API `/api/data/spatial`
 
 ## Stage D: Annotation
 
-入口：
+Entrypoint:
 
 - `annotation/run_annotation_main.py`
-- `ensagent_tools/annotation.py`
+- Wrapper: `ensagent_tools/annotation.py`
 
-主要输入：
+Inputs:
 
-- `output/best/<sample_id>/BEST_<sample_id>_spot.csv`
-- `output/best/<sample_id>/BEST_<sample_id>_DEGs.csv`
-- `output/best/<sample_id>/BEST_<sample_id>_PATHWAY.csv`
+- `BEST_<sample_id>_spot.csv`
+- `BEST_<sample_id>_DEGs.csv`
+- `BEST_<sample_id>_PATHWAY.csv`
+- provider/API configuration
 
-规范输出：
+Outputs:
 
 - `output/best/<sample_id>/annotation_output/domain_annotations.json`
 
-下游消费者：
+Downstream consumers:
 
-- `/api/annotation/{sample_id}/{cluster_id}`
+- API `/api/annotation/{sample_id}/{cluster_id}`
+- frontend annotation panel
 
-## API 读取层
+## API Read Layer
 
-### `/api/data/spatial`
+`/api/data/spatial`
 
-读取：
+- Reads `output/best/<sample_id>/BEST_<sample_id>_spot.csv`
+- Returns spot coordinates and domain labels
 
-- `output/best/<sample_id>/BEST_<sample_id>_spot.csv`
+`/api/data/scores`
 
-返回：
+- Reads `scoring/output/<sample_id>/consensus/scores_matrix.csv`
+- Reads `scoring/output/<sample_id>/consensus/labels_matrix.csv`
+- Falls back to shared legacy consensus paths only for old result compatibility
 
-- spot 坐标、cluster/domain 信息
+`/api/annotation/{sample_id}/{cluster_id}`
 
-### `/api/data/scores`
+- Preferentially reads `output/best/<sample_id>/annotation_output/domain_annotations.json`
+- Falls back to the old shared annotation path only for old result compatibility
 
-读取：
+## Current Constraints
 
-- `scoring/output/<sample_id>/consensus/scores_matrix.csv`
-- `scoring/output/<sample_id>/consensus/labels_matrix.csv`
-
-兼容回退：
-
-- 仅为旧结果兼容，才回退到共享 `scoring/output/consensus/`
-
-### `/api/annotation/{sample_id}/{cluster_id}`
-
-读取：
-
-- 首选 `output/best/<sample_id>/annotation_output/domain_annotations.json`
-
-兼容回退：
-
-- 仅为旧结果兼容，才回退到旧共享路径
-
-## 当前约束
-
-- API 和前端不得再把共享输出目录当作默认事实来源。
-- 新样本运行结果必须按 `sample_id` 隔离。
-- `pipeline_config.yaml` 只描述运行参数，不承担“推断最新结果路径”的职责。
+- API and frontend code must not treat shared output directories as the default source of truth.
+- New sample runs must isolate outputs by `sample_id`.
+- `pipeline_config.yaml` describes runtime parameters; it should not be used to infer the newest result path.

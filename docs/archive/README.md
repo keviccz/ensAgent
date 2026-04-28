@@ -1,18 +1,14 @@
 # Archive
 
-日期：2026-04-10
+This directory stores historical materials that are no longer part of the active development path but are kept for traceability.
 
-这里存放已退出主开发流、但仍需保留以供追溯的历史资料。
+Current archive contents:
 
-当前归档内容：
+- `design/`: frontend design screenshots, page previews, and debug captures.
+- `superpowers/`: older AI-collaboration specs and plans retained as implementation history.
 
-- `design/`
-  - 前端设计截图、页面预览、调试图。
-- `superpowers/`
-  - 旧的 AI 协作 spec / plan 文档，保留为历史实现记录，不再作为当前仓库入口文档。
+Maintenance rules:
 
-维护规则：
-
-- 新的主流程说明放在 `docs/` 根目录。
-- 已完成、仅供回看或审计的设计/计划文档移动到 `docs/archive/`。
-- 归档内容可以保留历史背景，不要求与当前运行时完全同步，但路径引用应保持可打开。
+- Current workflow documentation should live in `docs/`.
+- Completed or historical design and planning documents should live under `docs/archive/`.
+- Archived material may preserve historical context and does not need to match the current runtime exactly, but links should remain readable when possible.

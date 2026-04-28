@@ -1,27 +1,38 @@
-# Conda 环境安装（Tool-runner 用）
+# Conda Environment Setup for Tool-Runner
 
-Tool-runner 需要 3 个独立 Conda 环境（R / PY / PY2）。环境文件统一放在仓库根目录的 `envs/`。
+Tool-Runner uses three separate Conda/Mamba environments for method execution:
 
-## 1) 创建环境（在仓库根目录运行）
+- `R`: IRIS, BASS, DR-SC, BayesSpace
+- `PY`: SEDR, GraphST, STAGATE
+- `PY2`: stLearn
+
+The canonical environment files are stored under `envs/`.
+
+## Create Environments
+
+Run these commands from the repository root:
 
 ```bash
-conda env create -f envs/R_environment.yml
-conda env create -f envs/PY_environment.yml
-conda env create -f envs/PY2_environment.yml
+mamba env create -f envs/R_environment.yml
+mamba env create -f envs/PY_environment.yml
+mamba env create -f envs/PY2_environment.yml
 ```
 
-## 2) prefix 说明（已统一）
+`conda env create` can be used instead of `mamba env create`, but Mamba is recommended for faster solving.
 
-这些 yml 文件末尾包含：
-- `prefix: ./envs/conda/R`
-- `prefix: ./envs/conda/PY`
-- `prefix: ./envs/conda/PY2`
+## Environment Prefixes
 
-这会把环境安装到仓库目录下，方便移动/复制项目。
+The YAML files install environments under the repository-local `envs/conda/` directory:
 
-## 3) 进一步说明
+- `envs/conda/R`
+- `envs/conda/PY`
+- `envs/conda/PY2`
 
-更完整的 Tool-runner 运行指南请看：
+This keeps method environments portable with the project checkout.
+
+## More Information
+
+See the Tool-Runner documentation for method-specific setup and execution details:
+
 - `Tool-runner/SETUP_GUIDE.md`
 - `Tool-runner/README.md`
-

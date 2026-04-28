@@ -1,11 +1,21 @@
 # EnsAgent
 
 <div align="center">
+  <h3>Ensemble Multi-Agent Framework for Spatial Transcriptomics</h3>
+  <p>
+    <b>English</b> | <a href="#中文说明">中文</a>
+  </p>
+  <p>
+    <a href="#quick-start">Quick Start</a> ·
+    <a href="#method-code-and-data-availability">Method & Data</a> ·
+    <a href="#core-commands">Commands</a> ·
+    <a href="https://github.com/keviccz/ensAgent/raw/main/Readme_example/Frontend-use.mp4">Demo Video</a>
+  </p>
   <img src="Readme_example/Diagram.png" alt="EnsAgent pipeline diagram" width="900">
   <br>
   <br>
   <a href="https://github.com/keviccz/ensAgent/raw/main/Readme_example/Frontend-use.mp4">
-    <img src="example_data/spatial_clustering_result_20251201_012647.png" alt="Frontend demo video preview" width="720">
+    <img src="example_data/spatial_clustering_result_20251201_012647.png" alt="EnsAgent frontend demo preview" width="720">
   </a>
   <br>
   <a href="https://github.com/keviccz/ensAgent/raw/main/Readme_example/Frontend-use.mp4">Watch the frontend demo video</a>
@@ -16,24 +26,22 @@ EnsAgent is an ensemble multi-agent framework for spatial transcriptomics analys
 ## Highlights
 
 - Eight wrapped spatial clustering methods: IRIS, BASS, DR-SC, BayesSpace, SEDR, GraphST, STAGATE, and stLearn.
-- One supported local app stack: FastAPI backend plus Next.js frontend, launched with `python start.py`.
-- Reproducible stage outputs for clustering labels, spatial plots, DEGs, pathway summaries, scores matrices, BEST labels, and final annotations.
-- Provider configuration through `pipeline_config.yaml` or environment variables, with Azure-compatible aliases still supported.
+- Supported local app stack: FastAPI backend plus Next.js frontend, launched with `python start.py`.
+- Reproducible outputs for clustering labels, spatial plots, DEGs, pathway summaries, score matrices, BEST labels, and final annotations.
+- Example data under `example_data/` is included for repository demos and frontend inspection.
 
 ## Quick Start
 
 ### 1. Create Environments
 
 ```bash
-# Main environment: API, LLM runtime, and shared tooling
 mamba env create -f environment.yml
 mamba activate ensagent
 python -m pip install -r requirements.txt
 
-# Tool-runner environments
-mamba env create -f envs/R_environment.yml    # IRIS, BASS, DR-SC, BayesSpace
-mamba env create -f envs/PY_environment.yml   # SEDR, GraphST, STAGATE
-mamba env create -f envs/PY2_environment.yml  # stLearn
+mamba env create -f envs/R_environment.yml
+mamba env create -f envs/PY_environment.yml
+mamba env create -f envs/PY2_environment.yml
 ```
 
 ### 2. Configure
@@ -56,17 +64,13 @@ Recommended provider environment variables:
 export ENSAGENT_API_PROVIDER="openai"
 export ENSAGENT_API_KEY="sk-..."
 export ENSAGENT_API_MODEL="gpt-4o"
-export ENSAGENT_API_ENDPOINT=""
-export ENSAGENT_API_VERSION=""
 ```
 
-Azure aliases are also supported: `AZURE_OPENAI_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, and `AZURE_OPENAI_API_VERSION`.
+Azure-compatible aliases are also supported: `AZURE_OPENAI_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, and `AZURE_OPENAI_API_VERSION`.
 
 ### 3. Run
 
 ```bash
-# Local web app
-mamba activate ensagent
 python start.py
 ```
 
@@ -80,14 +84,6 @@ Run the full pipeline from the command line:
 ```bash
 python endtoend.py
 python endtoend.py --data_path "<VISIUM_DIR>" --sample_id "DLPFC_151507" --n_clusters 7
-```
-
-Run focused checks:
-
-```bash
-python tools/health_check.py
-python -m unittest discover -s tests -v
-cd frontend && npm run build
 ```
 
 ## Method Code And Data Availability
@@ -107,8 +103,6 @@ EnsAgent wraps public method implementations. The table below lists the upstream
 
 ## Input Data
 
-For a standard 10x Visium sample:
-
 ```text
 data_directory/
 ├── filtered_feature_bc_matrix.h5
@@ -124,47 +118,27 @@ data_directory/
     └── spatialLIBD_p1.RData
 ```
 
-`RData/` is required only for wrappers that need the original method-specific R objects, especially IRIS and BASS. The other methods read the Visium directory directly.
+`RData/` is required only for wrappers that need original method-specific R objects, especially IRIS and BASS. Other methods read the Visium directory directly.
 
 ## Outputs
-
-A full run writes sample-scoped outputs under:
 
 ```text
 output/
 ├── tool_runner/<sample_id>/
-│   ├── domains/
-│   ├── spot/
-│   ├── DEGs/
-│   ├── PATHWAY/
-│   ├── PICTURES/
-│   └── tool_runner_report.json
 ├── best/<sample_id>/
-│   ├── BEST_<sample_id>_spot.csv
-│   ├── BEST_<sample_id>_DEGs.csv
-│   ├── BEST_<sample_id>_PATHWAY.csv
-│   ├── <sample_id>_result.png
-│   └── annotation_output/domain_annotations.json
 └── scoring/output/<sample_id>/
 ```
+
+Key output files include `BEST_<sample_id>_spot.csv`, `BEST_<sample_id>_DEGs.csv`, `BEST_<sample_id>_PATHWAY.csv`, `<sample_id>_result.png`, and `annotation_output/domain_annotations.json`.
 
 ## Core Commands
 
 ```bash
-# Tool-Runner only
 python Tool-runner/orchestrator.py --config Tool-runner/configs/DLPFC_151507.yaml
-
-# Scoring only
 cd scoring && python scoring.py
-
-# BEST builder only
-python ensemble/build_best.py \
-  --sample_id DLPFC_151507 \
-  --scores_matrix scoring/output/DLPFC_151507/consensus/scores_matrix.csv \
-  --labels_matrix scoring/output/DLPFC_151507/consensus/labels_matrix.csv \
-  --spot_template scoring/input/IRIS_DLPFC_151507_spot.csv \
-  --visium_dir "D:/path/to/data/151507" \
-  --output_dir output/best/DLPFC_151507
+python tools/health_check.py
+python -m unittest discover -s tests -v
+cd frontend && npm run build
 ```
 
 ## Requirements
@@ -172,5 +146,42 @@ python ensemble/build_best.py \
 - Python 3.10+
 - R 4.2+
 - Miniforge/Mamba or Conda
-- 16 GB RAM minimum, 32 GB recommended
+- 16 GB RAM minimum; 32 GB recommended
 - GPU optional for SEDR, GraphST, and STAGATE
+
+---
+
+## 中文说明
+
+EnsAgent 是一个面向 10x Visium 空间转录组数据的集成式多智能体分析框架。它统一运行 8 种空间聚类方法，使用 LLM/VLM 智能体评估 domain 证据，构建 BEST 共识结果，并通过多智能体流程完成空间 domain 注释。
+
+### 主要特点
+
+- 集成 8 种空间聚类方法：IRIS、BASS、DR-SC、BayesSpace、SEDR、GraphST、STAGATE、stLearn。
+- 当前支持的本地应用栈为 FastAPI 后端 + Next.js 前端，通过 `python start.py` 启动。
+- 输出包括聚类标签、空间图、DEG、pathway、评分矩阵、BEST 标签和最终注释。
+- `example_data/` 中包含可用于仓库展示和前端查看的示例数据。
+
+### 快速运行
+
+```bash
+mamba env create -f environment.yml
+mamba activate ensagent
+python -m pip install -r requirements.txt
+
+mamba env create -f envs/R_environment.yml
+mamba env create -f envs/PY_environment.yml
+mamba env create -f envs/PY2_environment.yml
+
+cp pipeline_config.example.yaml pipeline_config.yaml
+python start.py
+```
+
+启动后访问：
+
+- FastAPI 后端：`http://localhost:8000`
+- Next.js 前端：`http://localhost:3000`
+
+### 数据与方法
+
+方法实现与数据要求见上方英文表格。IRIS 和 BASS 需要额外的 `RData/` 输入对象，其余方法主要读取标准 10x Visium 目录。
