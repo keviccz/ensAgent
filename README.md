@@ -1,6 +1,6 @@
-# EnsAgent
 
 <div align="center">
+  <h1>EnsAgent</h1>
   <h3>Ensemble Multi-Agent Framework for Spatial Transcriptomics</h3>
   <p>
     <b>English</b> | <a href="README_CN.md">中文</a>
